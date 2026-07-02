@@ -1,4 +1,4 @@
-package com.zendent.api;
+package com.zendent;
 
 import org.springframework.boot.SpringApplication;
 
