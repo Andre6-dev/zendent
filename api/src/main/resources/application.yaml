@@ -1,3 +1,16 @@
 spring:
   application:
     name: api
+  flyway:
+    enabled: true
+    validate-on-migrate: true
+  jpa:
+    hibernate:
+      # TODO(2.1.8/2.1.9): flip to "validate" once V1__init.sql exists.
+      # spring-modulith-starter-jpa registers its own event_publication JPA
+      # entity into this persistence unit regardless of our base package, so
+      # ddl-auto=validate fails NOW with "missing table [event_publication]" —
+      # there is no Flyway migration yet to own that table (that is task
+      # 2.1.8, PR-4). Left at "none" (Boot's own default for a non-embedded
+      # datasource) until the baseline migration lands.
+      ddl-auto: none

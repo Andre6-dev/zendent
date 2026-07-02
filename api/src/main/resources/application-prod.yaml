@@ -1,0 +1,21 @@
+# Production profile. Every secret/connection value is env-injected —
+# no default values, so a missing env var fails startup loudly instead
+# of silently falling back to a dev secret.
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+
+zendent:
+  jwt:
+    secret: ${JWT_SECRET}
+  tenant:
+    base-domain: zendent.app
+    dev-header-override-enabled: false
+
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    enabled: false
