@@ -1,0 +1,27 @@
+# --- OS ---
+.DS_Store
+
+# --- Env / secrets ---
+.env
+.env.*
+*.local
+
+# --- Frontend build output (webapp-zendent/.gitignore also applies) ---
+node_modules/
+dist/
+dist-ssr/
+.output/
+.nitro/
+.tanstack/
+.vinxi/
+.wrangler/
+
+# --- Backend build output (api/.gitignore also applies) ---
+target/
+build/
+
+# --- Claude Code local (machine-specific) settings ---
+.claude/settings.local.json
+
+# --- Skill registry cache ---
+.atl/.skill-registry.cache.json

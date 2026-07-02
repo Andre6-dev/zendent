@@ -1,0 +1,26 @@
+@import 'tailwindcss';
+@import '@heroui/styles';
+@import '@heroui-pro/react/css';
+
+/*
+ * Zendenta brand accent. Declared outside any @layer so it overrides the
+ * layered HeroUI theme default (--accent) in both light and dark.
+ * A confident royal blue-indigo; keeps white (`--snow`) foreground contrast.
+ */
+:root {
+  --accent: oklch(0.55 0.215 264);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+}

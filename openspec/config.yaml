@@ -1,0 +1,40 @@
+schema: spec-driven
+
+context: |
+  Product: zendent-app (multi-project: frontend + backend, cross-cutting changes)
+  Frontend (webapp-zendent/): React 19, TanStack Start (Vite 8 + Nitro, SSR), TypeScript 6,
+    TailwindCSS v4, HeroUI v3 + HeroUI Pro, TanStack Router/Query/Form/Table, Zod 4. PM: Bun.
+  Backend (api/): Java 25, Spring Boot 4.0.7, Spring Modulith 2.0.7, Spring Data JPA,
+    Spring Security, Flyway, Springdoc OpenAPI 3.0.2, PostgreSQL, Testcontainers.
+    groupId/package: com.zendent / com.zendent.api. Build: Maven (mvnw). Near-empty scaffold.
+  Testing: frontend `bun run test` (vitest); backend `./mvnw test` (Surefire + Testcontainers).
+  IMPORTANT: legacy docs under webapp-zendent/docs/plan/ describe Gradle and `com.zendenta` —
+    both are STALE. The real code uses Maven and `com.zendent`. Treat real code as authoritative.
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+    - Cross-cutting changes must state which side(s) (frontend/backend/both) are affected
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+    - For backend design, follow Spring Modulith module boundaries
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+    - Group frontend and backend tasks separately when a change spans both
+  apply:
+    - Follow existing code patterns
+    - Frontend: React 19 + TanStack Start + HeroUI Pro conventions
+    - Backend: Spring Boot 4 + Spring Modulith conventions, Flyway migrations for schema changes
+    tdd: true
+    test_command: "cd webapp-zendent && bun run test; cd ../api && ./mvnw test"
+  verify:
+    test_command: "cd webapp-zendent && bun run test; cd ../api && ./mvnw test"
+    build_command: "cd webapp-zendent && bun run build; cd ../api && ./mvnw -q -DskipTests package"
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas
