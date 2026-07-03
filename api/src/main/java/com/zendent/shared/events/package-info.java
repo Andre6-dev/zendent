@@ -1,6 +1,6 @@
 /**
- * Domain event contracts shared across modules (e.g. {@code ClinicCreatedEvent}),
+ * Domain event contracts shared across modules (e.g. {@link com.zendent.shared.events.ClinicCreatedEvent}),
  * published via {@code ApplicationEventPublisher} and durably recorded by the
- * Spring Modulith event-publication registry. Populated in PKG-2.1 (2.1.9).
+ * Spring Modulith event-publication registry (schema in {@code V1__init.sql}).
  */
 package com.zendent.shared.events;

@@ -6,11 +6,24 @@ spring:
     validate-on-migrate: true
   jpa:
     hibernate:
-      # TODO(2.1.8/2.1.9): flip to "validate" once V1__init.sql exists.
-      # spring-modulith-starter-jpa registers its own event_publication JPA
-      # entity into this persistence unit regardless of our base package, so
-      # ddl-auto=validate fails NOW with "missing table [event_publication]" —
-      # there is no Flyway migration yet to own that table (that is task
-      # 2.1.8, PR-4). Left at "none" (Boot's own default for a non-embedded
-      # datasource) until the baseline migration lands.
-      ddl-auto: none
+      # V1__init.sql (task 2.1.8) now creates event_publication (and the iam
+      # tables), so Flyway fully owns the schema and Hibernate only needs to
+      # validate against it — no more entities are mapped than what V1
+      # creates until the iam JPA entities land in 2.2.1.
+      ddl-auto: validate
+  modulith:
+    events:
+      # Flyway owns the event_publication schema (design D6): V1__init.sql
+      # creates the table with the exact DDL Hibernate's JPA entity expects,
+      # so Modulith must not also try to initialize it. This property is
+      # written for the spring-modulith-events-jdbc schema-init mechanism;
+      # it is a documented no-op for the JPA-based repository this project
+      # currently uses (spring-modulith-starter-jpa), kept here for design
+      # fidelity (D6) and to avoid a silent double-init if a JDBC-based
+      # event repository is ever adopted instead.
+      jdbc:
+        schema-initialization:
+          enabled: false
+      # Unprocessed event publications are retried on restart rather than
+      # dropped (spec: "Event survives listener failure").
+      republish-outstanding-events-on-restart: true
