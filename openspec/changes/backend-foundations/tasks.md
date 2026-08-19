@@ -26,25 +26,27 @@ Phase 2 backend foundation: platform bootstrap, `iam` auth, `shared` + tenancy. 
 
 Spec: `backend-platform/spec.md` (Local Environment Bootstrap, Database Schema Baseline, Module Boundary Verification, Domain Event Publication Infrastructure, Global Error Handling, API Documentation, Automated Test Suite). Design: D1, D3 (infra only), D4, D5, D6, D7.
 
-- [ ] **2.1.1 — MapStruct JDK-25 processor verification (EARLY, branching task)**
+- [x] **2.1.1 — MapStruct JDK-25 processor verification (EARLY, branching task)**
   Add `mapstruct` + `mapstruct-processor` 1.6.3 to `api/pom.xml` on a throwaway mapper and run `./mvnw compile` under the project's JDK 25 toolchain.
   - **If it succeeds:** keep MapStruct as the DTO-mapping standard (D5); leave the dependency in place for 2.2.
   - **If it fails:** remove the annotation-processor wiring, document the fallback (hand-written mappers) in this file's checklist, and note it for 2.2.2.
   - Blocks: 2.2.2 (needs the verdict before writing iam mappers).
   - Spec: none directly (tooling gate). Design: D5.
+  - **VERDICT: MapStruct works on JDK 25 — adopted.** Probe mapper compiled and generated `MapStructProbeMapperImpl` cleanly under Corretto 25.0.1 with `maven-compiler-plugin` `annotationProcessorPaths`. The MapStruct dependency + annotation-processor wiring is KEPT in `api/pom.xml`; the throwaway probe mapper was deleted after verification. 2.2.2 should use `@Mapper(componentModel = "spring", unmappedTargetPolicy = ERROR)`, no hand-written fallback needed.
 
-- [ ] **2.1.2** Move `ApiApplication` `com.zendent.api` → `com.zendent`; repackage `ApiApplicationTests`, `TestApiApplication`, `TestcontainersConfiguration` to `com.zendent`.
+- [x] **2.1.2** Move `ApiApplication` `com.zendent.api` → `com.zendent`; repackage `ApiApplicationTests`, `TestApiApplication`, `TestcontainersConfiguration` to `com.zendent`.
   Design: D1. Spec: prerequisite for Module Boundary Verification.
 
-- [ ] **2.1.3** Create `shared` module skeleton: `com.zendent.shared.package-info` with `@ApplicationModule(type = Type.OPEN)`; empty `tenancy/`, `events/`, `web/`, `domain/` sub-packages.
+- [x] **2.1.3** Create `shared` module skeleton: `com.zendent.shared.package-info` with `@ApplicationModule(type = Type.OPEN)`; empty `tenancy/`, `events/`, `web/`, `domain/` sub-packages.
   Design: D1 package map.
 
-- [ ] **2.1.4** Create `iam` module skeleton: `com.zendent.iam.package-info` (closed default); empty `domain/`, `web/`, `mapper/`, `internal/` sub-packages.
+- [x] **2.1.4** Create `iam` module skeleton: `com.zendent.iam.package-info` (closed default); empty `domain/`, `web/`, `mapper/`, `internal/` sub-packages.
   Design: D1 package map.
 
-- [ ] **2.1.5** `com.zendent.ModularityTests`: `ApplicationModules.of(ApiApplication.class).verify()` + `new Documenter(modules).writeDocumentation()` (PlantUML under `target/spring-modulith-docs/`).
+- [x] **2.1.5** `com.zendent.ModularityTests`: `ApplicationModules.of(ApiApplication.class).verify()` + `new Documenter(modules).writeDocumentation()` (PlantUML under `target/spring-modulith-docs/`).
   Spec: backend-platform/Module Boundary Verification (both scenarios). Design: D1 verification wiring.
   **DoD:** test passes with zero cross-module violations; docs artifact generated.
+  **STATUS: DONE.** `./mvnw test -Dtest=ModularityTests` → 2/2 green (`verifiesModuleStructure`, `writesDocumentation`). PlantUML/AsciiDoc artifacts confirmed at `api/target/spring-modulith-docs/` (`components.puml`, `module-iam.puml`, `module-shared.puml`, `all-docs.adoc`, `module-iam.adoc`, `module-shared.adoc`).
 
 - [ ] **2.1.6** Docker Compose PostgreSQL (`compose.yaml`) + `local`/`test`/`prod` Spring profiles (`application-{profile}.yaml`): datasource, Flyway `validate` on migrate, JWT secret per profile, tenant base-domain property, `ddl-auto=validate`, Swagger on/off per profile.
   Spec: backend-platform/Local Environment Bootstrap (both scenarios). Design: "Configuration & profiles" table.
@@ -189,9 +191,9 @@ PR-0 (git gate)
 
 ## Design cross-cutting checklist (traceability — mirrors design.md)
 
-- [ ] `ApiApplication` moved to `com.zendent`; tests repackaged. → 2.1.2
-- [ ] `ModularityTests` runs `verify()` + writes PlantUML docs. → 2.1.5
-- [ ] `shared` marked OPEN; `iam` closed with named-interface surface. → 2.1.3, 2.1.4
+- [x] `ApiApplication` moved to `com.zendent`; tests repackaged. → 2.1.2
+- [x] `ModularityTests` runs `verify()` + writes PlantUML docs. → 2.1.5
+- [x] `shared` marked OPEN; `iam` closed with named-interface surface. → 2.1.3, 2.1.4
 - [ ] `@TenantId` on `Membership.clinicId`; `ClinicTenantIdentifierResolver` wired into the `SessionFactory`. → 2.2.1, 2.3.2
 - [ ] `SubdomainTenantResolutionFilter` (early) resolves tenant from Host; apex/reserved labels skipped; unknown slug → 404. → 2.3.3
 - [ ] `TenantContextFilter` (after JWT auth) applies authoritative JWT tenant and asserts subdomain == JWT `clinic_id` (mismatch → 403). → 2.3.4
@@ -201,7 +203,7 @@ PR-0 (git gate)
 - [ ] `spring-boot-starter-oauth2-resource-server` added; HS256 encoder/decoder from one secret. → 2.1.7
 - [ ] `refresh_token` store with rotation + reuse detection; logout revokes. → 2.2.6, 2.2.7
 - [ ] `V1__init.sql` baseline (extensions + iam + refresh + invitation + Modulith `event_publication`). → 2.1.8
-- [ ] MapStruct added (or hand-written fallback if JDK 25 processor fails). → 2.1.1, 2.2.2
+- [x] MapStruct added (or hand-written fallback if JDK 25 processor fails). → 2.1.1, 2.2.2 — verdict: adopted, works on JDK 25.
 - [ ] `ClinicCreatedEvent` in `shared.events`; outbox schema in Flyway, auto-init disabled. → 2.1.9
 - [ ] `ProblemDetail` advice + Security entry-point/denied handlers. → 2.1.10
 - [ ] Monorepo git reconciliation resolved BEFORE first commit. → 0.1
