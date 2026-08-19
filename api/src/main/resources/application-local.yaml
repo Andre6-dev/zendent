@@ -1,0 +1,22 @@
+# Local development profile.
+# Datasource points at the PostgreSQL instance provisioned by `compose.yaml`.
+# Start it manually before running the app: `docker compose -f api/compose.yaml up -d`.
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/zendent
+    username: zendent
+    password: zendent
+
+zendent:
+  jwt:
+    # Dev-only secret, safe to keep in VCS. Never reused in prod.
+    secret: ${JWT_SECRET:da42bcaf88d2b6f7f9d8dc1e96913b7d1ba6ffb04278248ee6fa08120fe76041}
+  tenant:
+    base-domain: localhost
+    dev-header-override-enabled: true
+
+springdoc:
+  swagger-ui:
+    enabled: true
+  api-docs:
+    enabled: true

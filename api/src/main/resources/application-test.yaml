@@ -1,0 +1,17 @@
+# Test profile. No spring.datasource block here on purpose: the
+# @ServiceConnection-annotated Testcontainers PostgreSQL bean
+# (TestcontainersConfiguration) auto-configures the datasource for the
+# test suite, fully isolated from the local/prod databases.
+zendent:
+  jwt:
+    # Dev-only secret, safe to keep in VCS. Never reused in prod.
+    secret: 02ae2c9fd1e3d12cdc5582c581536e098a626da1bfaa81b1c5bce4451de9a525
+  tenant:
+    base-domain: localhost
+    dev-header-override-enabled: true
+
+springdoc:
+  swagger-ui:
+    enabled: true
+  api-docs:
+    enabled: true
