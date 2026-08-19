@@ -58,14 +58,18 @@ Spec: `backend-platform/spec.md` (Local Environment Bootstrap, Database Schema B
   **Note:** this is infra plumbing only; login/token-issuance logic is built in 2.2, tenancy filters wired into this chain in 2.3.5.
   **STATUS: DONE.** `SecurityConfig` (`com.zendent`): `SecurityFilterChain` bean permits `/swagger-ui/**`, `/swagger-ui.html`, `/v3/api-docs/**` and (temporarily) everything else (`anyRequest().permitAll()` — no protected business endpoint exists yet, marked with a `TODO(PKG-2.2/2.3)`); stateless session policy; CSRF disabled (stateless JWT API). `NimbusJwtEncoder`/`NimbusJwtDecoder` both built from ONE `SecretKeySpec` bean sourced from `zendent.jwt.secret` (HS256). Verified: full test suite green (14/14) + live `local`-profile boot (`docker compose up` → app boots with the JWT beans wired → clean teardown).
 
-- [ ] **2.1.8** Flyway `V1__init.sql`: `CREATE EXTENSION IF NOT EXISTS pgcrypto`; `clinic`, `app_user`, `role`, `membership`, `refresh_token`, `staff_invitation` tables with FKs/unique constraints/indexes; seed `role` catalog rows; Modulith `event_publication` DDL.
+- [x] **2.1.8** Flyway `V1__init.sql`: `CREATE EXTENSION IF NOT EXISTS pgcrypto`; `clinic`, `app_user`, `role`, `membership`, `refresh_token`, `staff_invitation` tables with FKs/unique constraints/indexes; seed `role` catalog rows; Modulith `event_publication` DDL.
   Spec: backend-platform/Database Schema Baseline. Design: D4, D6 (schema ownership).
   **DoD:** applies cleanly against an empty DB; re-running the app does not reapply it.
   **Blocks:** 2.2.1 (entities map to these tables), 2.3.9 (isolation test needs `membership.clinic_id`).
+  **STATUS: DONE.** `api/src/main/resources/db/migration/V1__init.sql`: `pgcrypto` extension, `clinic`/`app_user`/`role`/`membership`/`refresh_token`/`staff_invitation` per D4 (FKs, `unique(clinic_id,user_id)` on membership, indexes on `clinic_id`/`user_id`/`token_hash`/`token`), seeded `role` rows (ADMIN, DENTIST, STAFF), and the Modulith `event_publication` table. The `event_publication` DDL was NOT hand-guessed: it was captured by booting the app once with `ddl-auto=create` + `show-sql` against a live Postgres 17 (Compose) to get Hibernate's EXACT generated `CREATE TABLE` for `org.springframework.modulith.events.jpa.updating.DefaultJpaEventPublication` (spring-modulith-events-jpa 2.0.7), then transcribed verbatim into the migration. **Known limitation flagged (not silently fixed):** `serialized_event` is `varchar(255)` because that is Hibernate's default JPA string-column length on the library's own entity (no `@Column(length=...)` override) — real JSON event payloads can exceed 255 chars and would fail at insert time; widening it would break the `ddl-auto=validate` match, so it is left as-is with an inline SQL comment flagging it as a follow-up. Verified: applies cleanly against an empty Testcontainers DB AND a live Compose Postgres DB; `flyway_schema_history` shows version 1 applied once, re-running the app does not reapply it.
 
-- [ ] **2.1.9** Modulith event infra config: `spring.modulith.events.jdbc.schema-initialization.enabled=false`, `spring.modulith.events.republish-outstanding-events-on-restart=true`; stub `ClinicCreatedEvent` record in `com.zendent.shared.events` (fields only, no consumer yet).
+- [x] **2.1.9** Modulith event infra config: `spring.modulith.events.jdbc.schema-initialization.enabled=false`, `spring.modulith.events.republish-outstanding-events-on-restart=true`; stub `ClinicCreatedEvent` record in `com.zendent.shared.events` (fields only, no consumer yet).
   Spec: backend-platform/Domain Event Publication Infrastructure. Design: D6.
   **Rationale for placing the event class here (not in 2.3):** `iam` (2.2) publishes it and `shared` (2.3) owns its package concurrently — stubbing it in 2.1, which blocks both, avoids a cross-dependency between the two parallel tracks.
+  **STATUS: DONE.** Both properties added under `spring.modulith.events` in base `application.yaml` (shared across profiles). **Note:** `jdbc.schema-initialization.enabled=false` is a documented no-op given this project's JPA-based event repository (`spring-modulith-starter-jpa`, not `-jdbc`) — kept for design fidelity (D6) and to guard against a silent double-init if the project ever switches to the JDBC-based repository. `ClinicCreatedEvent` (record: `clinicId`, `slug`, `occurredAt`) added in `com.zendent.shared.events`, fields only, no consumer/listener.
+
+  **PKG-2.1 CLOSED.** `ddl-auto` restored from the PR-2 bridge (`none`) to the design's target `validate` — `V1__init.sql` now creates every table Hibernate needs to validate against (only `event_publication` is currently JPA-mapped; iam entities land in 2.2.1). Verified both via Testcontainers (`./mvnw test`) and a live `local`-profile boot against Compose Postgres. **This unblocks PKG-2.2 (iam) and PKG-2.3 (tenancy) for parallel fan-out.**
 
 - [x] **2.1.10** `GlobalExceptionHandler` (`@RestControllerAdvice`, `com.zendent.shared.web`) mapping validation → 400, auth → 401 (generic message), access-denied → 403, not-found → 404, conflict → 409, fallback → 500 (opaque, no stack trace); register `AuthenticationEntryPoint`/`AccessDeniedHandler` in `SecurityConfig` for filter-chain-stage errors.
   Spec: backend-platform/Global Error Handling (both scenarios). Design: D7.
@@ -75,10 +79,12 @@ Spec: `backend-platform/spec.md` (Local Environment Bootstrap, Database Schema B
   Spec: backend-platform/API Documentation.
   **STATUS: DONE.** `OpenApiConfig` (`com.zendent`) registers an `OpenAPI` bean with a `bearerAuth` HTTP-bearer/JWT security scheme. Verified two ways: (1) `ApiDocsAndSwaggerIntegrationTest` (2/2, `@SpringBootTest` + MockMvc, `test` profile) asserts `/v3/api-docs` returns 200 and contains `"bearerAuth"`, and `/swagger-ui/index.html` returns 200; (2) live `local`-profile boot against Compose Postgres — `curl /v3/api-docs` → 200 + `bearerAuth`, `curl /swagger-ui/index.html` → 200 — then clean teardown (`docker compose down -v`).
 
-- [ ] **2.1.12** Verify `TestcontainersConfiguration` still resolves after the 2.1.2 package move; add a baseline smoke test asserting the Spring context loads and `V1__init.sql` applied.
+- [x] **2.1.12** Verify `TestcontainersConfiguration` still resolves after the 2.1.2 package move; add a baseline smoke test asserting the Spring context loads and `V1__init.sql` applied.
   Spec: backend-platform/Automated Test Suite, Local Environment Bootstrap (test-profile scenario).
+  **STATUS: DONE.** `TestcontainersConfiguration` (already at `com.zendent` since PR-1) confirmed still resolving — `DatabaseBaselineSmokeTest` (`com.zendent`, `@Import(TestcontainersConfiguration.class)` + `@SpringBootTest` + `@ActiveProfiles("test")`) added with 3 tests: context loads AND `flyway_schema_history` records a successful version-1 migration; `role` table contains the 3 seeded rows; `event_publication` table exists (`information_schema.tables` check). 3/3 green.
 
-- [ ] **2.1.13** Close PKG-2.1 DoD: `./mvnw test` green (including `ModularityTests` + smoke test). This is the gate that unblocks 2.2 and 2.3.
+- [x] **2.1.13** Close PKG-2.1 DoD: `./mvnw test` green (including `ModularityTests` + smoke test). This is the gate that unblocks 2.2 and 2.3.
+  **STATUS: DONE. PKG-2.1 CLOSED.** `./mvnw test` → **17/17 green** (`GlobalExceptionHandlerTest` 7, `ProblemDetailWriterTest` 2, `ApiDocsAndSwaggerIntegrationTest` 2, `DatabaseBaselineSmokeTest` 3 (new), `ModularityTests` 2, `ApiApplicationTests` 1) — all with `spring.jpa.hibernate.ddl-auto=validate` active (the PR-2 bridge is now resolved). Also verified live: `local`-profile boot against Compose Postgres — app started, `\dt` shows all 7 baseline tables + `event_publication`, `role` seeded with 3 rows, `flyway_schema_history` shows version 1 applied — then clean teardown (`docker compose down -v`, no leftover containers/volumes). **PKG-2.2 (iam) and PKG-2.3 (tenancy) are now unblocked to fan out in parallel per the PR-slice plan.**
 
 ---
 
@@ -206,9 +212,9 @@ PR-0 (git gate)
 - [ ] Mandatory tenant-isolation test green. → 2.3.8
 - [ ] `spring-boot-starter-oauth2-resource-server` added; HS256 encoder/decoder from one secret. → 2.1.7
 - [ ] `refresh_token` store with rotation + reuse detection; logout revokes. → 2.2.6, 2.2.7
-- [ ] `V1__init.sql` baseline (extensions + iam + refresh + invitation + Modulith `event_publication`). → 2.1.8
+- [x] `V1__init.sql` baseline (extensions + iam + refresh + invitation + Modulith `event_publication`). → 2.1.8
 - [x] MapStruct added (or hand-written fallback if JDK 25 processor fails). → 2.1.1, 2.2.2 — verdict: adopted, works on JDK 25.
-- [ ] `ClinicCreatedEvent` in `shared.events`; outbox schema in Flyway, auto-init disabled. → 2.1.9
+- [x] `ClinicCreatedEvent` in `shared.events`; outbox schema in Flyway, auto-init disabled. → 2.1.9
 - [ ] `ProblemDetail` advice + Security entry-point/denied handlers. → 2.1.10
 - [ ] Monorepo git reconciliation resolved BEFORE first commit. → 0.1
 
