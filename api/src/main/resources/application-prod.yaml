@@ -4,8 +4,14 @@
 spring:
   datasource:
     url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    username: ${DB_APP_USERNAME}
+    password: ${DB_APP_PASSWORD}
+  flyway:
+    url: ${DB_URL}
+    user: ${DB_OWNER_USERNAME}
+    password: ${DB_OWNER_PASSWORD}
+    placeholders:
+      applicationRole: ${DB_APP_USERNAME}
 
 zendent:
   jwt:
