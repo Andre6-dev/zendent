@@ -4,8 +4,14 @@
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/zendent
-    username: zendent
-    password: zendent
+    username: zendent_app
+    password: zendent_app
+  flyway:
+    url: jdbc:postgresql://localhost:5432/zendent
+    user: zendent_owner
+    password: zendent_owner
+    placeholders:
+      applicationRole: zendent_app
 
 zendent:
   jwt:

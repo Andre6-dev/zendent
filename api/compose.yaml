@@ -4,14 +4,15 @@ services:
     container_name: zendent-postgres-local
     environment:
       POSTGRES_DB: zendent
-      POSTGRES_USER: zendent
-      POSTGRES_PASSWORD: zendent
+      POSTGRES_USER: zendent_owner
+      POSTGRES_PASSWORD: zendent_owner
     ports:
       - "5432:5432"
     volumes:
       - zendent-postgres-data:/var/lib/postgresql/data
+      - ./src/main/resources/db/init/00-create-application-role.sql:/docker-entrypoint-initdb.d/00-create-application-role.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U zendent -d zendent"]
+      test: ["CMD-SHELL", "pg_isready -U zendent_owner -d zendent"]
       interval: 5s
       timeout: 5s
       retries: 10

@@ -1,7 +1,10 @@
-# Test profile. No spring.datasource block here on purpose: the
-# @ServiceConnection-annotated Testcontainers PostgreSQL bean
-# (TestcontainersConfiguration) auto-configures the datasource for the
-# test suite, fully isolated from the local/prod databases.
+# Test profile. TestcontainersConfiguration contributes separate connection
+# details for Flyway's owner role and the application's restricted role.
+spring:
+  flyway:
+    placeholders:
+      applicationRole: zendent_app
+
 zendent:
   jwt:
     # Dev-only secret, safe to keep in VCS. Never reused in prod.

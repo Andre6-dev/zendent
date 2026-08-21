@@ -2,6 +2,9 @@ package com.zendent;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Arrays;
+
+import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -23,12 +26,16 @@ class DatabaseBaselineSmokeTest {
 	@Autowired
 	private JdbcTemplate jdbcTemplate;
 
+	@Autowired
+	private Flyway flyway;
+
 	@Test
 	void flywayAppliedV1BaselineMigration() {
-		Integer historyRows = jdbcTemplate.queryForObject(
-				"SELECT COUNT(*) FROM flyway_schema_history WHERE version = '1' AND success = true", Integer.class);
+		var appliedVersions = Arrays.stream(flyway.info().applied())
+				.map(migration -> migration.getVersion().getVersion())
+				.toList();
 
-		assertThat(historyRows).isEqualTo(1);
+		assertThat(appliedVersions).contains("1");
 	}
 
 	@Test
