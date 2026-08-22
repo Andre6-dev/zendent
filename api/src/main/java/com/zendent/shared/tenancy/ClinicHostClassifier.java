@@ -1,6 +1,7 @@
 package com.zendent.shared.tenancy;
 
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -8,8 +9,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Single source of truth for classifying request hosts before a Clinic can be
- * resolved. The onboarding endpoint and the future subdomain resolution filter
- * share this policy.
+ * resolved. The onboarding endpoint and the subdomain resolution filter share
+ * this policy so they can never disagree about what a host means.
  */
 @Component
 public final class ClinicHostClassifier {
@@ -23,21 +24,37 @@ public final class ClinicHostClassifier {
 	}
 
 	public HostKind classify(String serverName) {
-		String host = serverName.toLowerCase(Locale.ROOT);
-		if (host.equals(baseDomain)) {
-			return HostKind.APEX_OR_RESERVED;
+		return label(serverName)
+			.map(label -> RESERVED_LABELS.contains(label) ? HostKind.APEX_OR_RESERVED : HostKind.CLINIC)
+			.orElseGet(() -> normalize(serverName).equals(baseDomain) ? HostKind.APEX_OR_RESERVED : HostKind.INVALID);
+	}
+
+	/**
+	 * The Clinic slug this host names, or empty when the host names no Clinic —
+	 * the apex, a reserved label, or anything outside the base domain.
+	 */
+	public Optional<String> clinicSlug(String serverName) {
+		return label(serverName).filter(label -> !RESERVED_LABELS.contains(label));
+	}
+
+	/**
+	 * The single label directly beneath the base domain, or empty when the host
+	 * is the apex itself, sits outside the base domain, or nests deeper than one
+	 * label — {@code deep.acme.zendent.app} names no Clinic.
+	 */
+	private Optional<String> label(String serverName) {
+		String host = normalize(serverName);
+		String suffix = "." + baseDomain;
+		if (!host.endsWith(suffix)) {
+			return Optional.empty();
 		}
 
-		String baseDomainSuffix = "." + baseDomain;
-		if (!host.endsWith(baseDomainSuffix)) {
-			return HostKind.INVALID;
-		}
+		String label = host.substring(0, host.length() - suffix.length());
+		return label.contains(".") || label.isEmpty() ? Optional.empty() : Optional.of(label);
+	}
 
-		String label = host.substring(0, host.length() - baseDomainSuffix.length());
-		if (label.contains(".")) {
-			return HostKind.INVALID;
-		}
-		return RESERVED_LABELS.contains(label) ? HostKind.APEX_OR_RESERVED : HostKind.CLINIC;
+	private static String normalize(String serverName) {
+		return serverName.toLowerCase(Locale.ROOT);
 	}
 
 	public enum HostKind {

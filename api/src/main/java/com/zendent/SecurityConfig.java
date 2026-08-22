@@ -25,7 +25,9 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 
+import com.zendent.shared.tenancy.SubdomainClinicResolutionFilter;
 import com.zendent.shared.web.ProblemDetailWriter;
 
 /**
@@ -35,9 +37,9 @@ import com.zendent.shared.web.ProblemDetailWriter;
  * {@code ProblemDetail} responses for auth failures raised inside the filter
  * chain (before Spring MVC dispatch — see design D7 "filter-chain gap").
  *
- * <p>This is infra plumbing ONLY: no login/token-issuance logic (PKG-2.2) and
- * no tenancy filters (wired here in PKG-2.3.5) yet. No protected business
- * endpoint exists yet in this PR, so every route is temporarily permitted.
+ * <p>The Clinic-resolution filter runs ahead of authentication (issue #20).
+ * Login and token issuance (#21) and the JWT-authoritative Clinic filter (#22)
+ * are not built yet, so every route is still temporarily permitted.
  */
 @Configuration
 @EnableWebSecurity
@@ -51,10 +53,14 @@ public class SecurityConfig {
 
 	@Bean
 	SecurityFilterChain securityFilterChain(HttpSecurity http, JwtDecoder jwtDecoder,
-			AuthenticationEntryPoint authenticationEntryPoint, AccessDeniedHandler accessDeniedHandler)
+			AuthenticationEntryPoint authenticationEntryPoint, AccessDeniedHandler accessDeniedHandler,
+			SubdomainClinicResolutionFilter subdomainClinicResolutionFilter)
 			throws Exception {
 		http
 			.csrf(AbstractHttpConfigurer::disable)
+			// The Clinic is resolved from the host before authentication, so a
+			// public request (onboarding, login) is already scoped when it runs.
+			.addFilterBefore(subdomainClinicResolutionFilter, BearerTokenAuthenticationFilter.class)
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(authorize -> authorize
 				.requestMatchers(DOC_ENDPOINTS).permitAll()

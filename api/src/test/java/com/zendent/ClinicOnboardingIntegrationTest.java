@@ -131,9 +131,14 @@ class ClinicOnboardingIntegrationTest {
 	@Test
 	void registrationFromAClinicSubdomainIsRejected() throws Exception {
 		Registration registration = registration();
+		UUID existingClinic = UUID.randomUUID();
+		String existingSlug = "existing-" + existingClinic;
+		ownerJdbcTemplate.update(
+				"INSERT INTO clinic (id, name, slug, status) VALUES (?, 'Existing', ?, 'ACTIVE')",
+				existingClinic, existingSlug);
 
 		mockMvc.perform(post("/auth/register")
-				.header("Host", "existing.localhost")
+				.header("Host", existingSlug + ".localhost")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(registration.json()))
 			.andExpect(status().isForbidden())
