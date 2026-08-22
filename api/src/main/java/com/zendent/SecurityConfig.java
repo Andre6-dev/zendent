@@ -27,6 +27,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 
+import com.zendent.shared.domain.ErrorMessages;
 import com.zendent.shared.tenancy.SubdomainClinicResolutionFilter;
 import com.zendent.shared.web.ProblemDetailWriter;
 
@@ -111,13 +112,13 @@ public class SecurityConfig {
 	@Bean
 	AuthenticationEntryPoint authenticationEntryPoint() {
 		return (request, response, authException) ->
-				ProblemDetailWriter.write(response, PROBLEM_DETAIL_MAPPER, HttpStatus.UNAUTHORIZED, "Invalid credentials");
+				ProblemDetailWriter.write(response, PROBLEM_DETAIL_MAPPER, HttpStatus.UNAUTHORIZED, ErrorMessages.INVALID_CREDENTIALS);
 	}
 
 	@Bean
 	AccessDeniedHandler accessDeniedHandler() {
 		return (request, response, accessDeniedException) ->
-				ProblemDetailWriter.write(response, PROBLEM_DETAIL_MAPPER, HttpStatus.FORBIDDEN, "Access denied");
+				ProblemDetailWriter.write(response, PROBLEM_DETAIL_MAPPER, HttpStatus.FORBIDDEN, ErrorMessages.ACCESS_DENIED);
 	}
 
 }

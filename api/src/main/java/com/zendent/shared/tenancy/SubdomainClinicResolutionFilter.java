@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.zendent.shared.domain.ErrorMessages;
 import com.zendent.shared.web.ProblemDetailWriter;
 
 /**
@@ -93,7 +94,7 @@ public final class SubdomainClinicResolutionFilter extends OncePerRequestFilter 
 	}
 
 	private static void notFound(HttpServletResponse response) throws IOException {
-		ProblemDetailWriter.write(response, PROBLEM_DETAIL_MAPPER, HttpStatus.NOT_FOUND, "Unknown Clinic address");
+		ProblemDetailWriter.write(response, PROBLEM_DETAIL_MAPPER, HttpStatus.NOT_FOUND, ErrorMessages.UNKNOWN_CLINIC_ADDRESS);
 	}
 
 }

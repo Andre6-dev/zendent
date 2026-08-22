@@ -30,6 +30,10 @@ public class Role {
 		return id;
 	}
 
+	public Code code() {
+		return code;
+	}
+
 	public enum Code {
 		ADMIN,
 		DENTIST,

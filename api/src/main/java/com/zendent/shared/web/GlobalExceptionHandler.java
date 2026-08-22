@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import com.zendent.shared.domain.ErrorMessages;
 import com.zendent.shared.domain.NotFoundException;
 
 /**
@@ -42,26 +43,26 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	@Override
 	protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex,
 			HttpHeaders headers, HttpStatusCode status, WebRequest request) {
-		ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Validation failed");
+		ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ErrorMessages.VALIDATION_FAILED);
 		problemDetail.setProperty("errors", fieldErrors(ex));
 		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(problemDetail);
 	}
 
 	@ExceptionHandler(ConstraintViolationException.class)
 	public ProblemDetail handleConstraintViolation(ConstraintViolationException ex) {
-		ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Validation failed");
+		ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ErrorMessages.VALIDATION_FAILED);
 		problemDetail.setProperty("errors", violationErrors(ex));
 		return problemDetail;
 	}
 
 	@ExceptionHandler({ BadCredentialsException.class, AuthenticationException.class })
 	public ProblemDetail handleAuthenticationFailure(AuthenticationException ex) {
-		return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "Invalid credentials");
+		return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ErrorMessages.INVALID_CREDENTIALS);
 	}
 
 	@ExceptionHandler(AccessDeniedException.class)
 	public ProblemDetail handleAccessDenied(AccessDeniedException ex) {
-		return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, "Access denied");
+		return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ErrorMessages.ACCESS_DENIED);
 	}
 
 	@ExceptionHandler(NotFoundException.class)
@@ -71,13 +72,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
 	@ExceptionHandler(DataIntegrityViolationException.class)
 	public ProblemDetail handleConflict(DataIntegrityViolationException ex) {
-		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, "Resource conflict");
+		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ErrorMessages.RESOURCE_CONFLICT);
 	}
 
 	@ExceptionHandler(Exception.class)
 	public ProblemDetail handleUnexpected(Exception ex) {
 		log.error("Unhandled exception", ex);
-		return ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred");
+		return ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, ErrorMessages.UNEXPECTED_ERROR);
 	}
 
 	private static Map<String, String> fieldErrors(MethodArgumentNotValidException ex) {

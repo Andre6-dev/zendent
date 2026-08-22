@@ -53,6 +53,18 @@ public class User {
 		return id;
 	}
 
+	public String email() {
+		return email;
+	}
+
+	public String passwordHash() {
+		return passwordHash;
+	}
+
+	public Status status() {
+		return status;
+	}
+
 	public enum Status {
 		ACTIVE
 	}
