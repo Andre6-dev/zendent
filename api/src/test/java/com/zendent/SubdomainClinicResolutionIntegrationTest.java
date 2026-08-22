@@ -17,8 +17,16 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.context.annotation.Bean;
+import org.springframework.core.annotation.Order;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.zendent.shared.tenancy.SubdomainClinicResolutionFilter;
 
 import com.jayway.jsonpath.JsonPath;
 import com.zendent.shared.tenancy.TenantContext;
@@ -162,6 +170,23 @@ class SubdomainClinicResolutionIntegrationTest {
 		@GetMapping("/__probe/active-clinic")
 		String activeClinic() {
 			return TenantContext.get().map(UUID::toString).orElse("none");
+		}
+
+		/**
+		 * The application requires a session everywhere but onboarding and login
+		 * (#22). This probe reads the Clinic the subdomain resolved to, before
+		 * any session exists, so it declares its own anonymous chain rather than
+		 * asking production config to make room for a test path.
+		 */
+		@Bean
+		@Order(0)
+		SecurityFilterChain probeFilterChain(HttpSecurity http,
+				SubdomainClinicResolutionFilter subdomainClinicResolutionFilter) throws Exception {
+			http.securityMatcher("/__probe/**")
+				.csrf(AbstractHttpConfigurer::disable)
+				.addFilterBefore(subdomainClinicResolutionFilter, AuthorizationFilter.class)
+				.authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll());
+			return http.build();
 		}
 
 	}

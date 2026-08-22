@@ -22,12 +22,16 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 
 import com.zendent.shared.domain.ErrorMessages;
+import com.zendent.shared.tenancy.AuthenticatedClinicFilter;
 import com.zendent.shared.tenancy.SubdomainClinicResolutionFilter;
 import com.zendent.shared.web.ProblemDetailWriter;
 
@@ -38,13 +42,19 @@ import com.zendent.shared.web.ProblemDetailWriter;
  * {@code ProblemDetail} responses for auth failures raised inside the filter
  * chain (before Spring MVC dispatch — see design D7 "filter-chain gap").
  *
- * <p>The Clinic-resolution filter runs ahead of authentication (issue #20).
- * Login and token issuance (#21) and the JWT-authoritative Clinic filter (#22)
- * are not built yet, so every route is still temporarily permitted.
+ * <p>Two tenancy filters bracket authentication: the subdomain resolves a
+ * Clinic before it (#20), and the signed claim overrides that resolution after
+ * it (#22). Only onboarding, login and the API docs are public; everything else
+ * requires a session.
  */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+	private static final String[] PUBLIC_ENDPOINTS = {
+			"/auth/register",
+			"/auth/login",
+	};
 
 	private static final String[] DOC_ENDPOINTS = {
 			"/swagger-ui/**",
@@ -55,19 +65,23 @@ public class SecurityConfig {
 	@Bean
 	SecurityFilterChain securityFilterChain(HttpSecurity http, JwtDecoder jwtDecoder,
 			AuthenticationEntryPoint authenticationEntryPoint, AccessDeniedHandler accessDeniedHandler,
-			SubdomainClinicResolutionFilter subdomainClinicResolutionFilter)
+			SubdomainClinicResolutionFilter subdomainClinicResolutionFilter,
+			AuthenticatedClinicFilter authenticatedClinicFilter)
 			throws Exception {
 		http
 			.csrf(AbstractHttpConfigurer::disable)
 			// The Clinic is resolved from the host before authentication, so a
 			// public request (onboarding, login) is already scoped when it runs.
 			.addFilterBefore(subdomainClinicResolutionFilter, BearerTokenAuthenticationFilter.class)
+			// ...and the signed claim overrides it once authentication has run.
+			.addFilterAfter(authenticatedClinicFilter, BearerTokenAuthenticationFilter.class)
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(authorize -> authorize
 				.requestMatchers(DOC_ENDPOINTS).permitAll()
-				// TODO(PKG-2.2/2.3): replace with real authorization rules once
-				// protected business endpoints exist; none are built yet.
-				.anyRequest().permitAll())
+				// Public by necessity: onboarding runs before a Clinic exists,
+				// and login is how a session is obtained in the first place.
+				.requestMatchers(PUBLIC_ENDPOINTS).permitAll()
+				.anyRequest().authenticated())
 			.oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)))
 			.exceptionHandling(exceptions -> exceptions
 				.authenticationEntryPoint(authenticationEntryPoint)
@@ -91,10 +105,15 @@ public class SecurityConfig {
 	}
 
 	@Bean
-	JwtDecoder jwtDecoder(SecretKey jwtSecretKey) {
-		return NimbusJwtDecoder.withSecretKey(jwtSecretKey)
+	JwtDecoder jwtDecoder(SecretKey jwtSecretKey, @Value("${zendent.jwt.issuer}") String issuer) {
+		NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(jwtSecretKey)
 			.macAlgorithm(MacAlgorithm.HS256)
 			.build();
+		// A valid signature is not enough: the token must also come from this
+		// issuer, so one minted elsewhere under a shared secret is refused.
+		OAuth2TokenValidator<Jwt> validator = JwtValidators.createDefaultWithIssuer(issuer);
+		decoder.setJwtValidator(validator);
+		return decoder;
 	}
 
 	// NOTE: intentionally NOT @Autowired from the application context. This
