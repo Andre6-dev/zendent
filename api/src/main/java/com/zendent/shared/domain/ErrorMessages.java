@@ -28,6 +28,9 @@ public final class ErrorMessages {
 	public static final String REGISTRATION_REQUIRES_ONBOARDING_HOST =
 			"Clinic registration is only available on the onboarding host";
 
+	public static final String CLINIC_MISMATCH =
+			"This session belongs to a different Clinic";
+
 	public static final String LOGIN_REQUIRES_CLINIC_HOST =
 			"Login is only available on a Clinic's subdomain";
 

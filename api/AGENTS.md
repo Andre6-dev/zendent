@@ -24,6 +24,8 @@ A tenant-owned table is unreachable with no Clinic set. That is the fail-closed 
 
 **Every endpoint is documented.** A controller method carries `@Tag` on the class, `@Operation` on the method, and an `@ApiResponse` for each status it can actually produce — including the ones `GlobalExceptionHandler` emits on its behalf (400, 401, 403, 404, 409). Springdoc infers the happy path only; every failure an integration test asserts is a failure the OpenAPI document must name.
 
+**Every endpoint requires a session unless it is listed as public.** Onboarding and login are public because one runs before a Clinic exists and the other is how a session is obtained; the API docs are public per profile. Adding a route makes it authenticated by default — widening that is a deliberate edit to the public list, never an oversight.
+
 **Errors are RFC 7807 `ProblemDetail`, from one of two places:**
 
 - `GlobalExceptionHandler` — anything thrown after MVC dispatch.
@@ -31,7 +33,7 @@ A tenant-owned table is unreachable with no Clinic set. That is the fail-closed 
 
 Both paths return the same shape. A controller that builds an error response by hand breaks that guarantee; throw the exception and let the handler map it.
 
-**User-facing messages live in `com.zendent.shared.domain.ErrorMessages`, not in the throw site.** Two callers rejecting the same condition must not describe it two ways, and a message the API returns is part of the contract. That class does not exist yet — create it on the first change that needs it, and move the existing literals in `AuthController.java:39` and `GlobalExceptionHandler` with it.
+**User-facing messages live in `com.zendent.shared.domain.ErrorMessages`, not in the throw site.** Two callers rejecting the same condition must not describe it two ways, and a message the API returns is part of the contract. Add the constant there and reference it; a literal at a throw site is the thing this rule exists to prevent.
 
 Messages returned on an authentication failure stay generic. `"Invalid credentials"` never narrows to which half was wrong.
 
