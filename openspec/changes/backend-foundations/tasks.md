@@ -1,6 +1,6 @@
 # backend-foundations — Implementation Tasks
 
-Phase 2 backend foundation: platform bootstrap, `iam` auth, `shared` + tenancy. Backend-only (no frontend tasks). Dependency order: **2.1 blocks everything → 2.2 ∥ 2.3 run in parallel after 2.1**.
+Phase 2 backend foundation: platform bootstrap, `iam` auth, `shared` + Clinic isolation. Backend-only (no frontend tasks). Dependency order: **2.1 blocks everything → 2.2 ∥ 2.3 run in parallel after 2.1**.
 
 ## Review Workload Forecast
 
@@ -10,7 +10,7 @@ Phase 2 backend foundation: platform bootstrap, `iam` auth, `shared` + tenancy. 
 | Chained PRs recommended | **Yes** |
 | 400-line budget risk | **High** — no single phase fits in one PR; 2.1 alone needs ≥4 slices |
 | Decision needed before apply | **Yes** |
-| Chain strategy recommendation | Lean **feature-branch-chain**: PR-12 (mandatory tenant-isolation test) fans in on BOTH the 2.2 and 2.3 tracks, and this is a foundational rewrite nobody wants half-merged into `main` (iam without tenancy, or tenancy without iam, both leave `main` in a broken security state). A tracker branch lets 2.2/2.3 land independently-reviewed but integrate before touching `main`. `stacked-to-main` is a valid alternative if the team is fine with `main` briefly having iam merged without tenancy (acceptable only because there are no other consumers yet). **Orchestrator must confirm with the user before applying.** |
+| Chain strategy recommendation | Lean **feature-branch-chain**: PR-12 (mandatory Clinic-isolation test) fans in on BOTH the 2.2 and 2.3 tracks, and this is a foundational rewrite nobody wants half-merged into `main` (iam without Clinic isolation, or Clinic isolation without iam, both leave `main` in a broken security state). A tracker branch lets 2.2/2.3 land independently-reviewed but integrate before touching `main`. `stacked-to-main` is a valid alternative if the team is fine with `main` briefly having iam merged without Clinic isolation (acceptable only because there are no other consumers yet). **Orchestrator must confirm with the user before applying.** |
 
 ---
 
@@ -48,14 +48,14 @@ Spec: `backend-platform/spec.md` (Local Environment Bootstrap, Database Schema B
   **DoD:** test passes with zero cross-module violations; docs artifact generated.
   **STATUS: DONE.** `./mvnw test -Dtest=ModularityTests` → 2/2 green (`verifiesModuleStructure`, `writesDocumentation`). PlantUML/AsciiDoc artifacts confirmed at `api/target/spring-modulith-docs/` (`components.puml`, `module-iam.puml`, `module-shared.puml`, `all-docs.adoc`, `module-iam.adoc`, `module-shared.adoc`).
 
-- [x] **2.1.6** Docker Compose PostgreSQL (`compose.yaml`) + `local`/`test`/`prod` Spring profiles (`application-{profile}.yaml`): datasource, Flyway `validate` on migrate, JWT secret per profile, tenant base-domain property, `ddl-auto=validate`, Swagger on/off per profile.
+- [x] **2.1.6** Docker Compose PostgreSQL (`compose.yaml`) + `local`/`test`/`prod` Spring profiles (`application-{profile}.yaml`): datasource, Flyway `validate` on migrate, JWT secret per profile, Clinic base-domain property, `ddl-auto=validate`, Swagger on/off per profile.
   Spec: backend-platform/Local Environment Bootstrap (both scenarios). Design: "Configuration & profiles" table.
   **DoD:** app boots on `local` against Compose Postgres; `test` profile does not touch `local`/`prod` data.
   **STATUS: DONE, with one documented deviation.** `api/compose.yaml` provisions Postgres 17 for `local` (manual `docker compose up -d`, no `spring-boot-docker-compose` dependency added — kept out of scope). `application-{local,test,prod}.yaml` add datasource (local: Compose; test: none, Testcontainers `@ServiceConnection` auto-configures it; prod: `${DB_URL}`/`${DB_USERNAME}`/`${DB_PASSWORD}` env-only), `zendent.jwt.secret` (local/test: dev secret in config with env override; prod: `${JWT_SECRET}`, no default — fails loud if unset), `zendent.tenant.base-domain` + `dev-header-override-enabled` (local/test: `localhost`+enabled; prod: `zendent.app`+disabled), and `springdoc.swagger-ui/api-docs.enabled` (on for local/test, off for prod). Base `application.yaml` carries `spring.flyway.enabled=true` + `validate-on-migrate=true` (shared). **Deviation:** `spring.jpa.hibernate.ddl-auto` is temporarily `none` instead of the designed `validate` — `spring-modulith-starter-jpa` (already on the classpath from PR-1) registers its own `event_publication` JPA entity into the persistence unit regardless of app package, so `ddl-auto=validate` fails NOW with "missing table [event_publication]" since no Flyway migration exists yet to create it (that is task 2.1.8, out of scope here). Documented inline with a `TODO(2.1.8/2.1.9)` comment in `application.yaml`; must flip to `validate` once `V1__init.sql` lands. `ApiApplicationTests` now runs `@ActiveProfiles("test")` for isolation. Verified: `./mvnw test` green (3/3: `ModularityTests` 2, `ApiApplicationTests` 1); `local`-profile boot verified live against `docker compose up -d` Postgres — "Started ApiApplication in 3.006 seconds" — then `docker compose down -v` (no leftover containers/volumes).
 
 - [x] **2.1.7** Add `spring-boot-starter-oauth2-resource-server`; `SecurityConfig` skeleton in base package `com.zendent` with `NimbusJwtEncoder`/`NimbusJwtDecoder` beans from one HS256 `SecretKeySpec`, and the filter-chain shell (no business auth logic yet — that is 2.2/2.3).
   Design: D3 (library/pom impact), D1 (app config placement).
-  **Note:** this is infra plumbing only; login/token-issuance logic is built in 2.2, tenancy filters wired into this chain in 2.3.5.
+  **Note:** this is infra plumbing only; login/token-issuance logic is built in 2.2, Clinic-context filters are wired into this chain in 2.3.5.
   **STATUS: DONE.** `SecurityConfig` (`com.zendent`): `SecurityFilterChain` bean permits `/swagger-ui/**`, `/swagger-ui.html`, `/v3/api-docs/**` and (temporarily) everything else (`anyRequest().permitAll()` — no protected business endpoint exists yet, marked with a `TODO(PKG-2.2/2.3)`); stateless session policy; CSRF disabled (stateless JWT API). `NimbusJwtEncoder`/`NimbusJwtDecoder` both built from ONE `SecretKeySpec` bean sourced from `zendent.jwt.secret` (HS256). Verified: full test suite green (14/14) + live `local`-profile boot (`docker compose up` → app boots with the JWT beans wired → clean teardown).
 
 - [x] **2.1.8** Flyway `V1__init.sql`: `CREATE EXTENSION IF NOT EXISTS pgcrypto`; `clinic`, `app_user`, `role`, `membership`, `refresh_token`, `staff_invitation` tables with FKs/unique constraints/indexes; seed `role` catalog rows; Modulith `event_publication` DDL.
@@ -69,7 +69,7 @@ Spec: `backend-platform/spec.md` (Local Environment Bootstrap, Database Schema B
   **Rationale for placing the event class here (not in 2.3):** `iam` (2.2) publishes it and `shared` (2.3) owns its package concurrently — stubbing it in 2.1, which blocks both, avoids a cross-dependency between the two parallel tracks.
   **STATUS: DONE.** Both properties added under `spring.modulith.events` in base `application.yaml` (shared across profiles). **Note:** `jdbc.schema-initialization.enabled=false` is a documented no-op given this project's JPA-based event repository (`spring-modulith-starter-jpa`, not `-jdbc`) — kept for design fidelity (D6) and to guard against a silent double-init if the project ever switches to the JDBC-based repository. `ClinicCreatedEvent` (record: `clinicId`, `slug`, `occurredAt`) added in `com.zendent.shared.events`, fields only, no consumer/listener.
 
-  **PKG-2.1 CLOSED.** `ddl-auto` restored from the PR-2 bridge (`none`) to the design's target `validate` — `V1__init.sql` now creates every table Hibernate needs to validate against (only `event_publication` is currently JPA-mapped; iam entities land in 2.2.1). Verified both via Testcontainers (`./mvnw test`) and a live `local`-profile boot against Compose Postgres. **This unblocks PKG-2.2 (iam) and PKG-2.3 (tenancy) for parallel fan-out.**
+  **PKG-2.1 CLOSED.** `ddl-auto` restored from the PR-2 bridge (`none`) to the design's target `validate` — `V1__init.sql` now creates every table Hibernate needs to validate against (only `event_publication` is currently JPA-mapped; iam entities land in 2.2.1). Verified both via Testcontainers (`./mvnw test`) and a live `local`-profile boot against Compose Postgres. **This unblocks PKG-2.2 (iam) and PKG-2.3 (Clinic isolation) for parallel fan-out.**
 
 - [x] **2.1.10** `GlobalExceptionHandler` (`@RestControllerAdvice`, `com.zendent.shared.web`) mapping validation → 400, auth → 401 (generic message), access-denied → 403, not-found → 404, conflict → 409, fallback → 500 (opaque, no stack trace); register `AuthenticationEntryPoint`/`AccessDeniedHandler` in `SecurityConfig` for filter-chain-stage errors.
   Spec: backend-platform/Global Error Handling (both scenarios). Design: D7.
@@ -84,7 +84,7 @@ Spec: `backend-platform/spec.md` (Local Environment Bootstrap, Database Schema B
   **STATUS: DONE.** `TestcontainersConfiguration` (already at `com.zendent` since PR-1) confirmed still resolving — `DatabaseBaselineSmokeTest` (`com.zendent`, `@Import(TestcontainersConfiguration.class)` + `@SpringBootTest` + `@ActiveProfiles("test")`) added with 3 tests: context loads AND `flyway_schema_history` records a successful version-1 migration; `role` table contains the 3 seeded rows; `event_publication` table exists (`information_schema.tables` check). 3/3 green.
 
 - [x] **2.1.13** Close PKG-2.1 DoD: `./mvnw test` green (including `ModularityTests` + smoke test). This is the gate that unblocks 2.2 and 2.3.
-  **STATUS: DONE. PKG-2.1 CLOSED.** `./mvnw test` → **17/17 green** (`GlobalExceptionHandlerTest` 7, `ProblemDetailWriterTest` 2, `ApiDocsAndSwaggerIntegrationTest` 2, `DatabaseBaselineSmokeTest` 3 (new), `ModularityTests` 2, `ApiApplicationTests` 1) — all with `spring.jpa.hibernate.ddl-auto=validate` active (the PR-2 bridge is now resolved). Also verified live: `local`-profile boot against Compose Postgres — app started, `\dt` shows all 7 baseline tables + `event_publication`, `role` seeded with 3 rows, `flyway_schema_history` shows version 1 applied — then clean teardown (`docker compose down -v`, no leftover containers/volumes). **PKG-2.2 (iam) and PKG-2.3 (tenancy) are now unblocked to fan out in parallel per the PR-slice plan.**
+  **STATUS: DONE. PKG-2.1 CLOSED.** `./mvnw test` → **17/17 green** (`GlobalExceptionHandlerTest` 7, `ProblemDetailWriterTest` 2, `ApiDocsAndSwaggerIntegrationTest` 2, `DatabaseBaselineSmokeTest` 3 (new), `ModularityTests` 2, `ApiApplicationTests` 1) — all with `spring.jpa.hibernate.ddl-auto=validate` active (the PR-2 bridge is now resolved). Also verified live: `local`-profile boot against Compose Postgres — app started, `\dt` shows all 7 baseline tables + `event_publication`, `role` seeded with 3 rows, `flyway_schema_history` shows version 1 applied — then clean teardown (`docker compose down -v`, no leftover containers/volumes). **PKG-2.2 (iam) and PKG-2.3 (Clinic isolation) are now unblocked to fan out in parallel per the PR-slice plan.**
 
 ---
 
@@ -105,9 +105,9 @@ Spec: `iam-auth/spec.md` (Clinic Onboarding, Login, Token Refresh, Logout, Staff
 - [ ] **2.2.4** JWT token service: build access JWT (`sub`, `clinic_id`, `roles`, `email`, `iss`, `iat`, `exp`, `jti`) via `NimbusJwtEncoder` (from 2.1.7's bean); `BCryptPasswordEncoder` wiring for hash/verify.
   Design: D3 (token strategy table).
 
-- [ ] **2.2.5** `POST /auth/login` (tenant subdomain, public; body `{email, password}` only): resolve user by email, verify password, find `Membership` on the request's tenant (resolved by 2.3.3's filter), issue tokens; 401 on bad credentials or no membership on that clinic; 404 on unresolvable subdomain (delegated to 2.3.3); apex-host login rejected/handled outside the per-clinic contract.
+- [ ] **2.2.5** `POST /auth/login` (Clinic subdomain, public; body `{email, password}` only): resolve user by email, verify password, find `Membership` for the request's Clinic (resolved by 2.3.3's filter), issue tokens; 401 on bad credentials or no Membership in that Clinic; 404 on unresolvable subdomain (delegated to 2.3.3); apex-host login rejected/handled outside the per-Clinic contract.
   Spec: iam-auth/Login (all 5 scenarios). Design: D3 login sequence.
-  **Hard cross-dependency:** requires 2.3.1–2.3.3 (`TenantContext` + `SubdomainTenantResolutionFilter`) to be functionally present for the tenant-scoped lookup — flag at PR review if 2.3 slices lag behind.
+  **Hard cross-dependency:** requires 2.3.1–2.3.3 (`TenantContext` + `SubdomainTenantResolutionFilter`) to be functionally present for the Clinic-scoped lookup — flag at PR review if 2.3 slices lag behind.
 
 - [ ] **2.2.6** Refresh-token store + rotation + reuse detection (`refresh_token` hash, `rotated_from` lineage); `POST /auth/refresh` — 401 on expired/malformed/unknown token, entire-lineage revoke on reuse.
   Spec: iam-auth/Token Refresh (both scenarios). Design: D3 refresh sequence.
@@ -127,9 +127,9 @@ Spec: `iam-auth/spec.md` (Clinic Onboarding, Login, Token Refresh, Logout, Staff
 
 ---
 
-## Phase 2.3 — `shared` + tenancy (parallel with 2.2; depends on 2.1)
+## Phase 2.3 — `shared` + Clinic isolation (parallel with 2.2; depends on 2.1)
 
-Spec: `multi-tenancy/spec.md` (Tenant Attribution, Tenant-Scoped Query Filtering, Per-Request Tenant Context Activation, Cross-Tenant Isolation). Design: D2, D6 (contract already stubbed in 2.1.9), D1 (shared value objects).
+Spec: `multi-tenancy/spec.md` (Clinic Attribution, Clinic-Scoped Query Filtering, Per-Request Clinic Context Activation, Cross-Clinic Isolation). Design: D2, D6 (contract already stubbed in 2.1.9), D1 (shared value objects).
 
 - [ ] **2.3.1** `TenantContext` in `shared.tenancy`: `ThreadLocal<UUID>` with `set`/`get`/`clear`.
   Design: D2 components table.
@@ -137,12 +137,12 @@ Spec: `multi-tenancy/spec.md` (Tenant Attribution, Tenant-Scoped Query Filtering
 - [ ] **2.3.2** `ClinicTenantIdentifierResolver` implementing Hibernate `CurrentTenantIdentifierResolver<UUID>`, reading `TenantContext.get()`; confirm Spring Boot auto-wires it into the `SessionFactory`.
   Design: D2.
 
-- [ ] **2.3.3** `SubdomainTenantResolutionFilter` (`OncePerRequestFilter`, early in the chain): parse Host header; classify apex/reserved labels (`app`, `www`, `api`, bare apex) vs a real tenant slug; resolve `Clinic` by slug (global lookup) and `TenantContext.set(...)`; 404 on unknown non-reserved slug; skip `TenantContext` for apex/reserved hosts; dev override for `local`/`test` profiles only: `{slug}.localhost` base domain + `X-Tenant-Slug` header (never enabled in `prod`).
-  Spec: multi-tenancy/Per-Request Tenant Context Activation (subdomain scenario); iam-auth/Login (unresolvable-subdomain 404, apex-host scenarios). Design: D2 components table, D3 local/dev handling.
-  **Blocks:** 2.2.5 (login needs the resolved tenant).
+- [ ] **2.3.3** `SubdomainTenantResolutionFilter` (`OncePerRequestFilter`, early in the chain): parse Host header; classify apex/reserved labels (`app`, `www`, `api`, bare apex) vs a real Clinic slug; resolve `Clinic` by slug (global lookup) and `TenantContext.set(...)`; 404 on unknown non-reserved slug; skip `TenantContext` for apex/reserved hosts; dev override for `local`/`test` profiles only: `{slug}.localhost` base domain + `X-Tenant-Slug` header (never enabled in `prod`).
+  Spec: multi-tenancy/Per-Request Clinic Context Activation (subdomain scenario); iam-auth/Login (unresolvable-subdomain 404, apex-host scenarios). Design: D2 components table, D3 local/dev handling.
+  **Blocks:** 2.2.5 (login needs the resolved Clinic).
 
-- [ ] **2.3.4** `TenantContextFilter` (after the JWT resource-server auth filter): read `clinic_id` from JWT claims (authoritative); assert it matches the subdomain-resolved tenant from 2.3.3 (else 403); overwrite `TenantContext` with the JWT tenant; `clear()` in `finally`.
-  Spec: multi-tenancy/Per-Request Tenant Context Activation (JWT scenario, mismatch scenario). Design: D2.
+- [ ] **2.3.4** `TenantContextFilter` (after the JWT resource-server auth filter): read `clinic_id` from JWT claims (authoritative); assert it matches the subdomain-resolved Clinic from 2.3.3 (else 403); overwrite `TenantContext` with the JWT Clinic; `clear()` in `finally`.
+  Spec: multi-tenancy/Per-Request Clinic Context Activation (JWT scenario, mismatch scenario). Design: D2.
 
 - [ ] **2.3.5** Wire filter-chain order in `SecurityConfig` (2.1.7's skeleton): `SubdomainTenantResolutionFilter` → JWT resource-server auth → `TenantContextFilter`.
   Design: D2 chain-ordering note.
@@ -153,13 +153,12 @@ Spec: `multi-tenancy/spec.md` (Tenant Attribution, Tenant-Scoped Query Filtering
 - [ ] **2.3.7** Wildcard-subdomain CORS config item: `CorsConfigurationSource` allowing `https://*.zendent.app` + the apex/onboarding origin, credentials enabled.
   Design: D3 CORS/frontend implication note.
 
-- [ ] **2.3.8 — Mandatory tenant-isolation test (REQUIRED, non-optional)**
-  `@ApplicationModuleTest` or `@SpringBootTest` + Testcontainers: seed clinic A and clinic B each with a `Membership`; set tenant to A (via `TenantContext`/`X-Tenant-Slug`, no real DNS); assert the repository returns ONLY A's memberships; assert `find()` on B's membership id returns empty.
-  Spec: multi-tenancy/Cross-Tenant Isolation (all 3 scenarios), Tenant-Scoped Query Filtering. Design: "Mandatory isolation test" section.
-  **Integration checkpoint:** needs `Membership` (2.2.1) merged to run green — schedule this task after both 2.2 and 2.3 have landed their entity/resolver halves, even though it is written on the 2.3 track.
+- [x] **2.3.8 — REPLACED: database-enforced Clinic-isolation gate**
+  The planned repository-only test was replaced by the native `DataSource` RLS suite delivered in issues #8 and #10. A repository test cannot prove the database layer: it would stay green under Hibernate `@TenantId` even if every PostgreSQL policy were removed. The replacement uses the restricted application role, native SQL, catalog enumeration, transaction-local Clinic publication, and forced pool reuse. Repository/HTTP coverage remains in 2.3.9 for request and ORM behavior.
+  Spec: multi-tenancy/Independent Database Enforcement, Cross-Clinic Isolation, Clinic-Scoped Query Filtering. Design: "Mandatory isolation tests" section.
 
-- [ ] **2.3.9** Multi-tenancy filter integration tests: JWT-vs-subdomain match activates the tenant; mismatch → 403 with no tenant activated; public request activates tenant from subdomain alone.
-  Spec: multi-tenancy/Per-Request Tenant Context Activation (all 3 scenarios).
+- [ ] **2.3.9** Clinic-context filter integration tests: JWT-vs-subdomain match activates the Clinic; mismatch → 403 with no Clinic activated; public request activates the Clinic from subdomain alone.
+  Spec: multi-tenancy/Per-Request Clinic Context Activation (all 3 scenarios).
 
 ---
 
@@ -175,13 +174,13 @@ Chain order follows `2.1 → (2.2 ∥ 2.3)`. Each PR is one deliverable work uni
 | PR-3 | 2.1.7, 2.1.10, 2.1.11 | ~250–350 | ProblemDetail scenarios pass; Swagger UI reachable | Sequential (after PR-2) |
 | PR-4 | 2.1.8, 2.1.9, 2.1.12, 2.1.13 | ~200–350 | Flyway applies cleanly; `./mvnw test` green — **closes PKG-2.1, unblocks fan-out** | Sequential (after PR-3) |
 | PR-5 | 2.2.1–2.2.3 | ~350–400 | Onboarding scenarios (all 3) green | **Parallel start** with PR-9 |
-| PR-6 | 2.2.4–2.2.5 | ~300–400 | Login scenarios (all 5) green | Sequential after PR-5; depends on PR-9 for tenant resolution |
+| PR-6 | 2.2.4–2.2.5 | ~300–400 | Login scenarios (all 5) green | Sequential after PR-5; depends on PR-9 for Clinic resolution |
 | PR-7 | 2.2.6–2.2.7 | ~250–350 | Refresh + logout scenarios green | Sequential after PR-6 |
 | PR-8 | 2.2.8–2.2.10 | ~300–450 | Staff invitation + protected-endpoint + full iam integration suite green — **closes PKG-2.2** | Sequential after PR-7 |
 | PR-9 | 2.3.1–2.3.3 | ~250–350 | Subdomain resolution + apex/reserved classification tested | **Parallel start** with PR-5 |
 | PR-10 | 2.3.4–2.3.5, 2.3.7 | ~200–300 | Filter chain order verified; CORS config present | Sequential after PR-9 |
 | PR-11 | 2.3.6 | ~150–250 | Value objects unit-tested | Parallel with PR-10 |
-| PR-12 | 2.3.8–2.3.9 | ~200–300 | Mandatory isolation test green; filter integration scenarios green — **closes PKG-2.3, fan-in** | Sequential; requires PR-5 (Membership) AND PR-10 merged |
+| PR-12 | 2.3.9 | ~100–200 | Filter integration scenarios green; native RLS gate already delivered by the 2.3.8 replacement — **closes PKG-2.3, fan-in** | Sequential; requires PR-5 (Membership) AND PR-10 merged |
 
 **Dependency diagram:**
 
@@ -195,7 +194,7 @@ PR-0 (git gate)
 ```
 
 **Parallelizable:** PR-5↔PR-9 start together; PR-10↔PR-11 can run together; the two tracks (PR-5→PR-8 and PR-9→PR-12) proceed independently except the PR-12 fan-in.
-**Strictly sequential:** PR-0→PR-1→PR-2→PR-3→PR-4 (each depends on the prior); PR-6 needs PR-9 merged (tenant resolution) before login can be tested end-to-end even though it's a separate track.
+**Strictly sequential:** PR-0→PR-1→PR-2→PR-3→PR-4 (each depends on the prior); PR-6 needs PR-9 merged (Clinic resolution) before login can be tested end-to-end even though it's a separate track.
 
 ---
 
@@ -205,11 +204,11 @@ PR-0 (git gate)
 - [x] `ModularityTests` runs `verify()` + writes PlantUML docs. → 2.1.5
 - [x] `shared` marked OPEN; `iam` closed with named-interface surface. → 2.1.3, 2.1.4
 - [ ] `@TenantId` on `Membership.clinicId`; `ClinicTenantIdentifierResolver` wired into the `SessionFactory`. → 2.2.1, 2.3.2
-- [ ] `SubdomainTenantResolutionFilter` (early) resolves tenant from Host; apex/reserved labels skipped; unknown slug → 404. → 2.3.3
-- [ ] `TenantContextFilter` (after JWT auth) applies authoritative JWT tenant and asserts subdomain == JWT `clinic_id` (mismatch → 403). → 2.3.4
+- [ ] `SubdomainTenantResolutionFilter` (early) resolves the Clinic from Host; apex/reserved labels skipped; unknown slug → 404. → 2.3.3
+- [ ] `TenantContextFilter` (after JWT auth) applies the authoritative JWT Clinic and asserts subdomain == JWT `clinic_id` (mismatch → 403). → 2.3.4
 - [ ] `local`/`test` dev override: `{slug}.localhost` + `X-Tenant-Slug` header (never enabled in `prod`). → 2.3.3
 - [ ] Wildcard-subdomain CORS noted as a config item. → 2.3.7
-- [ ] Mandatory tenant-isolation test green. → 2.3.8
+- [x] Native RLS Clinic-isolation gate green; repository-only plan replaced because it cannot prove database enforcement. → 2.3.8 replacement (#8, #10)
 - [ ] `spring-boot-starter-oauth2-resource-server` added; HS256 encoder/decoder from one secret. → 2.1.7
 - [ ] `refresh_token` store with rotation + reuse detection; logout revokes. → 2.2.6, 2.2.7
 - [x] `V1__init.sql` baseline (extensions + iam + refresh + invitation + Modulith `event_publication`). → 2.1.8
