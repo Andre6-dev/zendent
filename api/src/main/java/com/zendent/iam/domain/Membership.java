@@ -52,6 +52,10 @@ public class Membership {
 		this.createdAt = Instant.now();
 	}
 
+	public UUID id() {
+		return id;
+	}
+
 	public UUID clinicId() {
 		return clinicId;
 	}
@@ -62,6 +66,10 @@ public class Membership {
 
 	public Role role() {
 		return role;
+	}
+
+	public Instant createdAt() {
+		return createdAt;
 	}
 
 	public Status status() {
