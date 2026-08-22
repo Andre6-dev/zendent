@@ -52,6 +52,22 @@ public class Membership {
 		this.createdAt = Instant.now();
 	}
 
+	public UUID clinicId() {
+		return clinicId;
+	}
+
+	public User user() {
+		return user;
+	}
+
+	public Role role() {
+		return role;
+	}
+
+	public Status status() {
+		return status;
+	}
+
 	public enum Status {
 		ACTIVE
 	}
