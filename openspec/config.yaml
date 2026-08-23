@@ -6,7 +6,10 @@ context: |
     TailwindCSS v4, HeroUI v3 + HeroUI Pro, TanStack Router/Query/Form/Table, Zod 4. PM: Bun.
   Backend (api/): Java 25, Spring Boot 4.0.7, Spring Modulith 2.0.7, Spring Data JPA,
     Spring Security, Flyway, Springdoc OpenAPI 3.0.2, PostgreSQL, Testcontainers.
-    groupId/package: com.zendent / com.zendent.api. Build: Maven (mvnw). Near-empty scaffold.
+    groupId/package: com.zendent, base package com.zendent. Build: Maven (mvnw).
+    Modules `shared` (OPEN) and `iam` are built; Clinic isolation is enforced in two
+    layers (Hibernate @TenantId plus PostgreSQL RLS, ADR 0008). See api/AGENTS.md for
+    the conventions any backend change must follow.
   Testing: frontend `bun run test` (vitest); backend `./mvnw test` (Surefire + Testcontainers).
   IMPORTANT: legacy docs under webapp-zendent/docs/plan/ describe Gradle and `com.zendenta` —
     both are STALE. The real code uses Maven and `com.zendent`. Treat real code as authoritative.

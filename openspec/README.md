@@ -18,15 +18,17 @@ openspec/
 
 ## Notes
 
-- The product root (`/Users/andregallegos/Developer/zendent-app/`) is NOT a git
-  repository. Do not run git commands here. The frontend package
-  (`webapp-zendent/`) is its own git repo — commits for frontend changes
-  happen there, and for the backend inside `api/` once it has its own repo
-  or a monorepo root is established.
+- The product root IS the git repository, and the only one. `webapp-zendent/`
+  and `api/` are directories inside it, not nested repos or submodules — see
+  ADR 0016. An earlier version of this note claimed the opposite and was the
+  source of the confusion behind the `backend-foundations` git gate (task 0.1).
+  Run git commands from the product root.
 - Real code is authoritative over the legacy planning docs under
   `webapp-zendent/docs/plan/`. Known discrepancies: those docs describe a
   Gradle backend build and package `com.zendenta`; the actual scaffold uses
   Maven and package `com.zendent.api` (groupId `com.zendent`).
-- Roadmap intent (see `webapp-zendent/docs/plan/phase-*.md`): change 1 is
-  `frontend-layout-reservations` (Fase 1), change 2 is `backend-foundations`
-  (Fase 2).
+- Roadmap intent (see `webapp-zendent/docs/plan/phase-*.md`): change 1 was
+  `frontend-layout-reservations` (Fase 1) and change 2 was `backend-foundations`
+  (Fase 2). Both are archived; their specs are merged into `specs/`. The next
+  changes are the business modules the Fase 2 proposal put out of scope —
+  `patients`, `treatments`, `reservations` against the real API.
