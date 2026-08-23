@@ -31,17 +31,17 @@ public class ClinicLoginService {
 	private final UserRepository userRepository;
 	private final MembershipRepository membershipRepository;
 	private final PasswordEncoder passwordEncoder;
-	private final AccessTokenIssuer accessTokenIssuer;
+	private final RefreshTokenService refreshTokenService;
 
 	ClinicLoginService(UserRepository userRepository, MembershipRepository membershipRepository,
-			PasswordEncoder passwordEncoder, AccessTokenIssuer accessTokenIssuer) {
+			PasswordEncoder passwordEncoder, RefreshTokenService refreshTokenService) {
 		this.userRepository = userRepository;
 		this.membershipRepository = membershipRepository;
 		this.passwordEncoder = passwordEncoder;
-		this.accessTokenIssuer = accessTokenIssuer;
+		this.refreshTokenService = refreshTokenService;
 	}
 
-	@Transactional(readOnly = true)
+	@Transactional
 	public LoginResponse authenticate(String email, String password) {
 		Optional<User> user = userRepository.findByEmail(email.trim().toLowerCase(Locale.ROOT));
 
@@ -57,8 +57,7 @@ public class ClinicLoginService {
 			.filter(candidate -> candidate.status() == Membership.Status.ACTIVE)
 			.orElseThrow(() -> new BadCredentialsException(ErrorMessages.INVALID_CREDENTIALS));
 
-		AccessTokenIssuer.AccessToken token = accessTokenIssuer.issue(membership);
-		return new LoginResponse(token.value(), "Bearer", token.expiresInSeconds());
+		return refreshTokenService.startSession(membership);
 	}
 
 	/**

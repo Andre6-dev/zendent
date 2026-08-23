@@ -28,6 +28,8 @@ public final class ErrorMessages {
 	public static final String REGISTRATION_REQUIRES_ONBOARDING_HOST =
 			"Clinic registration is only available on the onboarding host";
 
+	public static final String INVALID_REFRESH_TOKEN = "Invalid refresh token";
+
 	public static final String MEMBER_NOT_FOUND = "No such member in this Clinic";
 
 	public static final String CLINIC_MISMATCH =

@@ -54,6 +54,9 @@ public class SecurityConfig {
 	private static final String[] PUBLIC_ENDPOINTS = {
 			"/auth/register",
 			"/auth/login",
+			// The access token it replaces may already have expired, so this
+			// cannot require one.
+			"/auth/refresh",
 	};
 
 	private static final String[] DOC_ENDPOINTS = {

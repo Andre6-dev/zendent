@@ -4,6 +4,9 @@ zendent:
     # Short-lived on purpose: a stolen access token expires quickly, and the
     # refresh token (#24) is what buys a new one without re-entering a password.
     access-token-ttl: PT15M
+    # Long enough that a person is not asked for a password daily, short enough
+    # that an abandoned session eventually dies on its own.
+    refresh-token-ttl: P30D
 
 spring:
   application:

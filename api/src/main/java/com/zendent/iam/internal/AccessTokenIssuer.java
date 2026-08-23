@@ -38,12 +38,13 @@ class AccessTokenIssuer {
 	AccessToken issue(Membership membership) {
 		Instant issuedAt = Instant.now();
 		Instant expiresAt = issuedAt.plus(timeToLive);
+		String jti = UUID.randomUUID().toString();
 
 		JwtClaimsSet claims = JwtClaimsSet.builder()
 			.issuer(issuer)
 			.issuedAt(issuedAt)
 			.expiresAt(expiresAt)
-			.id(UUID.randomUUID().toString())
+			.id(jti)
 			.subject(membership.user().id().toString())
 			.claim("clinic_id", membership.clinicId().toString())
 			.claim("email", membership.user().email())
@@ -53,10 +54,10 @@ class AccessTokenIssuer {
 		String value = jwtEncoder
 			.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
 			.getTokenValue();
-		return new AccessToken(value, timeToLive.toSeconds());
+		return new AccessToken(value, timeToLive.toSeconds(), jti);
 	}
 
-	record AccessToken(String value, long expiresInSeconds) {
+	record AccessToken(String value, long expiresInSeconds, String jti) {
 	}
 
 }
