@@ -1,6 +1,10 @@
 # Test profile. TestcontainersConfiguration contributes separate connection
 # details for Flyway's owner role and the application's restricted role.
 spring:
+  # Enables Boot's conditional mail auto-configuration; Testcontainers replaces
+  # this sentinel with Mailpit's actual host and mapped SMTP port at runtime.
+  mail:
+    host: localhost
   flyway:
     placeholders:
       applicationRole: zendent_app

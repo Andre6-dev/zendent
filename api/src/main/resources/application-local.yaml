@@ -2,6 +2,9 @@
 # Datasource points at the PostgreSQL instance provisioned by `compose.yaml`.
 # Start it manually before running the app: `docker compose -f api/compose.yaml up -d`.
 spring:
+  mail:
+    host: localhost
+    port: 1025
   datasource:
     url: jdbc:postgresql://localhost:5432/zendent
     username: zendent_app
