@@ -1,5 +1,6 @@
 package com.zendent.iam.domain;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -34,6 +35,9 @@ public class PasswordResetToken {
 	@Column(name = "created_at", nullable = false)
 	private Instant createdAt;
 
+	@Column(name = "used_at")
+	private Instant usedAt;
+
 	protected PasswordResetToken() {
 	}
 
@@ -51,6 +55,18 @@ public class PasswordResetToken {
 
 	public UUID clinicId() {
 		return clinicId;
+	}
+
+	public User user() {
+		return user;
+	}
+
+	public boolean isRedeemableAt(Instant moment, Duration timeToLive) {
+		return usedAt == null && createdAt.plus(timeToLive).isAfter(moment);
+	}
+
+	public void markUsed(Instant moment) {
+		usedAt = moment;
 	}
 
 }

@@ -18,9 +18,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.zendent.iam.internal.ClinicLoginService;
+import com.zendent.iam.internal.ClinicOnboardingService;
+import com.zendent.iam.internal.PasswordResetCompletionService;
 import com.zendent.iam.internal.PasswordResetRequestService;
 import com.zendent.iam.internal.RefreshTokenService;
-import com.zendent.iam.internal.ClinicOnboardingService;
 import com.zendent.iam.mapper.ClinicOnboardingMapper;
 import com.zendent.shared.domain.ErrorMessages;
 import com.zendent.shared.tenancy.TenantContext;
@@ -33,17 +34,33 @@ public class AuthController {
 	private final ClinicOnboardingService onboardingService;
 	private final ClinicLoginService loginService;
 	private final PasswordResetRequestService passwordResetRequestService;
+	private final PasswordResetCompletionService passwordResetCompletionService;
 	private final RefreshTokenService refreshTokenService;
 	private final ClinicOnboardingMapper mapper;
 
 	AuthController(ClinicOnboardingService onboardingService, ClinicLoginService loginService,
 			PasswordResetRequestService passwordResetRequestService,
+			PasswordResetCompletionService passwordResetCompletionService,
 			RefreshTokenService refreshTokenService, ClinicOnboardingMapper mapper) {
 		this.onboardingService = onboardingService;
 		this.loginService = loginService;
 		this.passwordResetRequestService = passwordResetRequestService;
+		this.passwordResetCompletionService = passwordResetCompletionService;
 		this.refreshTokenService = refreshTokenService;
 		this.mapper = mapper;
+	}
+
+	@PostMapping("/reset-password")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	@Operation(summary = "Complete a password reset",
+			description = "Consumes an unexpired, unused reset token issued for the Clinic resolved from the subdomain.")
+	@ApiResponses({
+			@ApiResponse(responseCode = "204", description = "Credential replaced"),
+			@ApiResponse(responseCode = "400", description = "Invalid payload or reset token", content = @io.swagger.v3.oas.annotations.media.Content),
+			@ApiResponse(responseCode = "404", description = "The host names no Clinic", content = @io.swagger.v3.oas.annotations.media.Content),
+	})
+	void resetPassword(@Valid @RequestBody PasswordResetCompletion completion) {
+		passwordResetCompletionService.complete(completion.token(), completion.newPassword());
 	}
 
 	@PostMapping("/forgot-password")

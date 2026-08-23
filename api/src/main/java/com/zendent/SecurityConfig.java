@@ -62,6 +62,9 @@ public class SecurityConfig {
 			"/auth/login",
 			// A person requesting recovery cannot have a session by definition.
 			"/auth/forgot-password",
+			// The reset token is the credential at this boundary; requiring the
+			// session it replaces would make recovery impossible.
+			"/auth/reset-password",
 			// The access token it replaces may already have expired, so this
 			// cannot require one.
 			"/auth/refresh",

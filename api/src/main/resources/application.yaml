@@ -14,6 +14,9 @@ zendent:
   mail:
     from: noreply@zendent.app
   password-reset:
+    # Credential-reset links are intentionally much shorter-lived than the
+    # seven-day invitation window.
+    ttl: PT1H
     link-template: "https://%s.zendent.app/reset-password?token=%s"
 
 spring:

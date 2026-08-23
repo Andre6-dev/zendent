@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import com.zendent.shared.domain.BadRequestException;
 import com.zendent.shared.domain.ConflictException;
 import com.zendent.shared.domain.ErrorMessages;
 import com.zendent.shared.domain.NotFoundException;
@@ -54,6 +55,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 		ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ErrorMessages.VALIDATION_FAILED);
 		problemDetail.setProperty("errors", violationErrors(ex));
 		return problemDetail;
+	}
+
+	@ExceptionHandler(BadRequestException.class)
+	public ProblemDetail handleBadRequest(BadRequestException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
 	}
 
 	@ExceptionHandler({ BadCredentialsException.class, AuthenticationException.class })

@@ -69,6 +69,11 @@ public class User {
 		return status;
 	}
 
+	public void changePassword(String passwordHash, Instant moment) {
+		this.passwordHash = passwordHash;
+		this.updatedAt = moment;
+	}
+
 	public enum Status {
 		ACTIVE
 	}
