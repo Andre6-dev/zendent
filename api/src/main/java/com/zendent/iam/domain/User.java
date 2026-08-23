@@ -36,6 +36,9 @@ public class User {
 	@Column(name = "updated_at", nullable = false)
 	private Instant updatedAt;
 
+	@Column(name = "credentials_changed_at", nullable = false)
+	private Instant credentialsChangedAt;
+
 	protected User() {
 	}
 
@@ -47,6 +50,7 @@ public class User {
 		this.status = Status.ACTIVE;
 		this.createdAt = Instant.now();
 		this.updatedAt = createdAt;
+		this.credentialsChangedAt = createdAt;
 	}
 
 	public UUID id() {
@@ -69,9 +73,14 @@ public class User {
 		return status;
 	}
 
+	public Instant credentialsChangedAt() {
+		return credentialsChangedAt;
+	}
+
 	public void changePassword(String passwordHash, Instant moment) {
 		this.passwordHash = passwordHash;
 		this.updatedAt = moment;
+		this.credentialsChangedAt = moment;
 	}
 
 	public enum Status {

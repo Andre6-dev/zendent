@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.zendent.iam.domain.Membership;
 import com.zendent.iam.domain.RefreshToken;
+import com.zendent.iam.domain.User;
 import com.zendent.iam.web.LoginResponse;
 import com.zendent.shared.domain.ErrorMessages;
 
@@ -30,16 +31,19 @@ import com.zendent.shared.domain.ErrorMessages;
 public class RefreshTokenService {
 
 	private final RefreshTokenRepository refreshTokenRepository;
+	private final UserRepository userRepository;
 	private final MembershipRepository membershipRepository;
 	private final RefreshTokenLineage lineage;
 	private final AccessTokenIssuer accessTokenIssuer;
 	private final SingleUseSecretPolicy secretPolicy;
 	private final Duration timeToLive;
 
-	RefreshTokenService(RefreshTokenRepository refreshTokenRepository, MembershipRepository membershipRepository,
+	RefreshTokenService(RefreshTokenRepository refreshTokenRepository, UserRepository userRepository,
+			MembershipRepository membershipRepository,
 			RefreshTokenLineage lineage, AccessTokenIssuer accessTokenIssuer, SingleUseSecretPolicy secretPolicy,
 			@Value("${zendent.jwt.refresh-token-ttl}") Duration timeToLive) {
 		this.refreshTokenRepository = refreshTokenRepository;
+		this.userRepository = userRepository;
 		this.membershipRepository = membershipRepository;
 		this.lineage = lineage;
 		this.accessTokenIssuer = accessTokenIssuer;
@@ -74,8 +78,16 @@ public class RefreshTokenService {
 			throw new BadCredentialsException(ErrorMessages.INVALID_REFRESH_TOKEN);
 		}
 
+		Membership membership = membershipOf(current);
+		User user = userRepository.findByIdForCredentialCheck(current.userId())
+			.orElseThrow(() -> new BadCredentialsException(ErrorMessages.INVALID_REFRESH_TOKEN));
+		if (current.wasIssuedOnOrBefore(user.credentialsChangedAt())) {
+			current.revoke(now);
+			throw new BadCredentialsException(ErrorMessages.INVALID_REFRESH_TOKEN);
+		}
+
 		current.revoke(now);
-		return issue(membershipOf(current), current.id());
+		return issue(membership, current.id());
 	}
 
 	@Transactional

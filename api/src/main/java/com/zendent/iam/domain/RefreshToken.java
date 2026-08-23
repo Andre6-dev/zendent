@@ -88,6 +88,10 @@ public class RefreshToken {
 		return !expiresAt.isAfter(moment);
 	}
 
+	public boolean wasIssuedOnOrBefore(Instant moment) {
+		return !issuedAt.isAfter(moment);
+	}
+
 	public void revoke(Instant moment) {
 		if (revokedAt == null) {
 			revokedAt = moment;

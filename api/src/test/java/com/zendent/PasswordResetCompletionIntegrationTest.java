@@ -70,6 +70,45 @@ class PasswordResetCompletionIntegrationTest {
 	}
 
 	@Test
+	void completingAResetInvalidatesEveryExistingRefreshToken() throws Exception {
+		Clinic clinic = registerClinic();
+		Clinic otherClinic = registerClinic();
+		addMembership(otherClinic, clinic.adminId());
+		RefreshCredential[] existingSessions = {
+				new RefreshCredential(clinic, refreshTokenFromLogin(clinic, clinic.adminEmail(), OLD_PASSWORD)),
+				new RefreshCredential(otherClinic,
+						refreshTokenFromLogin(otherClinic, clinic.adminEmail(), OLD_PASSWORD)),
+		};
+		String resetToken = "reset-" + UUID.randomUUID();
+		insertResetToken(clinic, resetToken);
+
+		mockMvc.perform(resetPassword(clinic, resetToken, NEW_PASSWORD))
+			.andExpect(status().isNoContent());
+
+		for (RefreshCredential session : existingSessions) {
+			mockMvc.perform(refresh(session.clinic(), session.token()))
+				.andExpect(status().isUnauthorized())
+				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+				.andExpect(jsonPath("$.accessToken").doesNotExist());
+		}
+	}
+
+	@Test
+	void aSessionStartedAfterTheResetRefreshesNormally() throws Exception {
+		Clinic clinic = registerClinic();
+		String resetToken = "reset-" + UUID.randomUUID();
+		insertResetToken(clinic, resetToken);
+		mockMvc.perform(resetPassword(clinic, resetToken, NEW_PASSWORD))
+			.andExpect(status().isNoContent());
+
+		String refreshToken = refreshTokenFromLogin(clinic, clinic.adminEmail(), NEW_PASSWORD);
+		mockMvc.perform(refresh(clinic, refreshToken))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.accessToken").isNotEmpty())
+			.andExpect(jsonPath("$.refreshToken").isNotEmpty());
+	}
+
+	@Test
 	void aTokenCannotBeUsedTwiceAndTheCredentialDoesNotChangeAgain() throws Exception {
 		Clinic clinic = registerClinic();
 		String token = "reset-" + UUID.randomUUID();
@@ -174,11 +213,39 @@ class PasswordResetCompletionIntegrationTest {
 
 	private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder login(
 			Clinic clinic, String password) {
+		return login(clinic, clinic.adminEmail(), password);
+	}
+
+	private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder login(
+			Clinic clinic, String email, String password) {
 		return post("/auth/login").with(serverName(clinic.host()))
 			.contentType(MediaType.APPLICATION_JSON)
 			.content("""
 					{"email":"%s","password":"%s"}
-					""".formatted(clinic.adminEmail(), password));
+					""".formatted(email, password));
+	}
+
+	private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder refresh(
+			Clinic clinic, String refreshToken) {
+		return post("/auth/refresh").with(serverName(clinic.host()))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+					{"refreshToken":"%s"}
+					""".formatted(refreshToken));
+	}
+
+	private String refreshTokenFromLogin(Clinic clinic, String email, String password) throws Exception {
+		String response = mockMvc.perform(login(clinic, email, password))
+			.andExpect(status().isOk())
+			.andReturn().getResponse().getContentAsString();
+		return JsonPath.read(response, "$.refreshToken");
+	}
+
+	private void addMembership(Clinic clinic, UUID userId) {
+		ownerJdbcTemplate.update("""
+				INSERT INTO membership (clinic_id, user_id, role_id, status)
+				SELECT ?, ?, id, 'ACTIVE' FROM role WHERE code = 'DENTIST'
+				""", clinic.id(), userId);
 	}
 
 	private Clinic registerClinic() throws Exception {
@@ -222,5 +289,8 @@ class PasswordResetCompletionIntegrationTest {
 		String host() {
 			return slug + ".localhost";
 		}
+	}
+
+	private record RefreshCredential(Clinic clinic, String token) {
 	}
 }

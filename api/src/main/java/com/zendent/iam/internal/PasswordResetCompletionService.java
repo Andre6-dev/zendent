@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.zendent.iam.domain.PasswordResetToken;
+import com.zendent.iam.domain.User;
 import com.zendent.shared.domain.BadRequestException;
 import com.zendent.shared.domain.ErrorMessages;
 
@@ -17,14 +18,16 @@ import com.zendent.shared.domain.ErrorMessages;
 public class PasswordResetCompletionService {
 
 	private final PasswordResetTokenRepository tokenRepository;
+	private final UserRepository userRepository;
 	private final SingleUseSecretPolicy secretPolicy;
 	private final PasswordEncoder passwordEncoder;
 	private final Duration timeToLive;
 
-	PasswordResetCompletionService(PasswordResetTokenRepository tokenRepository,
+	PasswordResetCompletionService(PasswordResetTokenRepository tokenRepository, UserRepository userRepository,
 			SingleUseSecretPolicy secretPolicy, PasswordEncoder passwordEncoder,
 			@Value("${zendent.password-reset.ttl}") Duration timeToLive) {
 		this.tokenRepository = tokenRepository;
+		this.userRepository = userRepository;
 		this.secretPolicy = secretPolicy;
 		this.passwordEncoder = passwordEncoder;
 		this.timeToLive = timeToLive;
@@ -32,11 +35,18 @@ public class PasswordResetCompletionService {
 
 	@Transactional
 	public void complete(String token, String newPassword) {
-		Instant now = Instant.now();
+		Instant validationMoment = Instant.now();
 		PasswordResetToken resetToken = tokenRepository.findByTokenHash(secretPolicy.hash(token))
-			.filter(candidate -> candidate.isRedeemableAt(now, timeToLive))
+			.filter(candidate -> candidate.isRedeemableAt(validationMoment, timeToLive))
 			.orElseThrow(() -> new BadRequestException(ErrorMessages.PASSWORD_RESET_NOT_REDEEMABLE));
-		resetToken.user().changePassword(passwordEncoder.encode(newPassword), now);
-		resetToken.markUsed(now);
+		String passwordHash = passwordEncoder.encode(newPassword);
+		User user = userRepository.findByIdForCredentialChange(resetToken.user().id())
+			.orElseThrow(() -> new IllegalStateException("Password reset token references no User"));
+		// This timestamp must be captured after the User lock is acquired. A
+		// concurrent refresh that won the lock has already committed its successor;
+		// one that lost it will observe this epoch after the reset commits.
+		Instant changedAt = Instant.now();
+		user.changePassword(passwordHash, changedAt);
+		resetToken.markUsed(changedAt);
 	}
 }

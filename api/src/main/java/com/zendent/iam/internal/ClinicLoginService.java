@@ -43,7 +43,8 @@ public class ClinicLoginService {
 
 	@Transactional
 	public LoginResponse authenticate(String email, String password) {
-		Optional<User> user = userRepository.findByEmail(email.trim().toLowerCase(Locale.ROOT));
+		Optional<User> user = userRepository.findByEmailForCredentialCheck(
+				email.trim().toLowerCase(Locale.ROOT));
 
 		// The password is verified even when no user matched, so that an unknown
 		// email and a known one cost the same time to reject.
