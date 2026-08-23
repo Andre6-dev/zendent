@@ -27,6 +27,7 @@ import com.zendent.shared.domain.BadRequestException;
 import com.zendent.shared.domain.ConflictException;
 import com.zendent.shared.domain.ErrorMessages;
 import com.zendent.shared.domain.NotFoundException;
+import com.zendent.shared.domain.TooManyRequestsException;
 
 /**
  * Translates unhandled and validation exceptions into RFC 7807
@@ -80,6 +81,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(ConflictException.class)
 	public ProblemDetail handleDomainConflict(ConflictException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+	}
+
+	@ExceptionHandler(TooManyRequestsException.class)
+	public ProblemDetail handleTooManyRequests(TooManyRequestsException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
 	}
 
 	@ExceptionHandler(DataIntegrityViolationException.class)

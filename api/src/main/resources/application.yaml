@@ -18,6 +18,9 @@ zendent:
     # seven-day invitation window.
     ttl: PT1H
     link-template: "https://%s.zendent.app/reset-password?token=%s"
+    rate-limit:
+      max-requests: 3
+      window: PT15M
 
 spring:
   application:

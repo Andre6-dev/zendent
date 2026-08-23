@@ -48,6 +48,9 @@ public final class ErrorMessages {
 	public static final String PASSWORD_RESET_REQUEST_ACCEPTED =
 			"If an account exists for that email, a password reset link will be sent.";
 
+	public static final String PASSWORD_RESET_RATE_LIMITED =
+			"Too many password reset requests. Try again later.";
+
 	public static final String PASSWORD_RESET_NOT_REDEEMABLE =
 			"This password reset link is invalid or has expired";
 

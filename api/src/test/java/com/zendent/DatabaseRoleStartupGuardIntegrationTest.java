@@ -39,7 +39,8 @@ class DatabaseRoleStartupGuardIntegrationTest {
 				.hasMessageContaining("SUPERUSER")
 				.hasMessageContaining("BYPASSRLS")
 				.hasMessageContaining(
-						"owns Clinic-scoped tables [membership, password_reset_token, refresh_token, staff_invitation]");
+						"owns Clinic-scoped tables [membership, password_reset_request_limit, "
+								+ "password_reset_token, refresh_token, staff_invitation]");
 	}
 
 	@Test

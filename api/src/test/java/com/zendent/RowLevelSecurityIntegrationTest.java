@@ -70,7 +70,8 @@ class RowLevelSecurityIntegrationTest {
 						UUID.randomUUID(), UUID.randomUUID(),
 						UUID.randomUUID(), UUID.randomUUID(),
 						UUID.randomUUID(), UUID.randomUUID(),
-						UUID.randomUUID(), UUID.randomUUID()));
+						UUID.randomUUID(), UUID.randomUUID(),
+						"limit-a-" + UUID.randomUUID(), "limit-b-" + UUID.randomUUID()));
 
 		ownerJdbcTemplate.update("""
 				INSERT INTO membership (id, clinic_id, user_id, role_id, status)
@@ -103,6 +104,13 @@ class RowLevelSecurityIntegrationTest {
 				"reset-" + fixture.rows().passwordResetTokenA(),
 				fixture.rows().passwordResetTokenB(), clinicB, userB,
 				"reset-" + fixture.rows().passwordResetTokenB());
+		ownerJdbcTemplate.update("""
+				INSERT INTO password_reset_request_limit
+				    (clinic_id, email_fingerprint, window_started_at, request_count)
+				VALUES (?, ?, now(), 1), (?, ?, now(), 1)
+				""",
+				clinicA, fixture.rows().passwordResetRequestLimitA(),
+				clinicB, fixture.rows().passwordResetRequestLimitB());
 	}
 
 	@Test
@@ -144,11 +152,15 @@ class RowLevelSecurityIntegrationTest {
 					.containsExactly(fixture.rows().staffInvitationA());
 			assertThat(queryIds(connection, "password_reset_token"))
 					.containsExactly(fixture.rows().passwordResetTokenA());
+			assertThat(queryStrings(connection, "password_reset_request_limit", "email_fingerprint"))
+					.containsExactly(fixture.rows().passwordResetRequestLimitA());
 
 			assertThat(countById(connection, "membership", fixture.rows().membershipB())).isZero();
 			assertThat(countById(connection, "refresh_token", fixture.rows().refreshTokenB())).isZero();
 			assertThat(countById(connection, "staff_invitation", fixture.rows().staffInvitationB())).isZero();
 			assertThat(countById(connection, "password_reset_token", fixture.rows().passwordResetTokenB())).isZero();
+			assertThat(countByKey(connection, "password_reset_request_limit", "email_fingerprint",
+					fixture.rows().passwordResetRequestLimitB())).isZero();
 		}
 	}
 
@@ -159,6 +171,7 @@ class RowLevelSecurityIntegrationTest {
 			assertThat(queryIds(connection, "refresh_token")).isEmpty();
 			assertThat(queryIds(connection, "staff_invitation")).isEmpty();
 			assertThat(queryIds(connection, "password_reset_token")).isEmpty();
+			assertThat(queryStrings(connection, "password_reset_request_limit", "email_fingerprint")).isEmpty();
 		}
 
 		assertInsertRejected(null, """
@@ -179,6 +192,11 @@ class RowLevelSecurityIntegrationTest {
 				INSERT INTO password_reset_token (id, clinic_id, user_id, token_hash)
 				VALUES (?, ?, ?, ?)
 				""", UUID.randomUUID(), fixture.clinicA(), fixture.spareUser(), "missing-" + UUID.randomUUID());
+		assertInsertRejected(null, """
+				INSERT INTO password_reset_request_limit
+				    (clinic_id, email_fingerprint, window_started_at, request_count)
+				VALUES (?, ?, now(), 1)
+				""", fixture.clinicA(), "missing-" + UUID.randomUUID());
 	}
 
 	@Test
@@ -201,6 +219,11 @@ class RowLevelSecurityIntegrationTest {
 				INSERT INTO password_reset_token (id, clinic_id, user_id, token_hash)
 				VALUES (?, ?, ?, ?)
 				""", UUID.randomUUID(), fixture.clinicB(), fixture.spareUser(), "wrong-" + UUID.randomUUID());
+		assertInsertRejected(fixture.clinicA(), """
+				INSERT INTO password_reset_request_limit
+				    (clinic_id, email_fingerprint, window_started_at, request_count)
+				VALUES (?, ?, now(), 1)
+				""", fixture.clinicB(), "wrong-" + UUID.randomUUID());
 	}
 
 	@Test
@@ -218,6 +241,9 @@ class RowLevelSecurityIntegrationTest {
 			assertThat(executeUpdate(connection,
 					"UPDATE password_reset_token SET token_hash = 'changed' WHERE id = ?",
 					fixture.rows().passwordResetTokenB())).isZero();
+			assertThat(executeUpdate(connection,
+					"UPDATE password_reset_request_limit SET request_count = 2 WHERE email_fingerprint = ?",
+					fixture.rows().passwordResetRequestLimitB())).isZero();
 
 			assertThat(executeUpdate(connection,
 					"DELETE FROM membership WHERE id = ?", fixture.rows().membershipB())).isZero();
@@ -227,6 +253,9 @@ class RowLevelSecurityIntegrationTest {
 					"DELETE FROM staff_invitation WHERE id = ?", fixture.rows().staffInvitationB())).isZero();
 			assertThat(executeUpdate(connection,
 					"DELETE FROM password_reset_token WHERE id = ?", fixture.rows().passwordResetTokenB())).isZero();
+			assertThat(executeUpdate(connection,
+					"DELETE FROM password_reset_request_limit WHERE email_fingerprint = ?",
+					fixture.rows().passwordResetRequestLimitB())).isZero();
 		}
 
 		assertThat(ownerJdbcTemplate.queryForObject(
@@ -242,6 +271,11 @@ class RowLevelSecurityIntegrationTest {
 				"SELECT token_hash FROM password_reset_token WHERE id = ?", String.class,
 				fixture.rows().passwordResetTokenB()))
 				.isEqualTo("reset-" + fixture.rows().passwordResetTokenB());
+		assertThat(ownerJdbcTemplate.queryForObject("""
+				SELECT request_count
+				FROM password_reset_request_limit
+				WHERE email_fingerprint = ?
+				""", Integer.class, fixture.rows().passwordResetRequestLimitB())).isOne();
 	}
 
 	@Test
@@ -309,6 +343,29 @@ class RowLevelSecurityIntegrationTest {
 		}
 	}
 
+	private List<String> queryStrings(Connection connection, String table, String column) throws SQLException {
+		try (PreparedStatement statement = connection.prepareStatement(
+				"SELECT " + column + " FROM " + table + " ORDER BY " + column);
+				ResultSet resultSet = statement.executeQuery()) {
+			var values = new java.util.ArrayList<String>();
+			while (resultSet.next()) {
+				values.add(resultSet.getString(column));
+			}
+			return values;
+		}
+	}
+
+	private int countByKey(Connection connection, String table, String column, Object value) throws SQLException {
+		try (PreparedStatement statement = connection.prepareStatement(
+				"SELECT COUNT(*) FROM " + table + " WHERE " + column + " = ?")) {
+			statement.setObject(1, value);
+			try (ResultSet resultSet = statement.executeQuery()) {
+				resultSet.next();
+				return resultSet.getInt(1);
+			}
+		}
+	}
+
 	private int countRows(Connection connection, String table) throws SQLException {
 		try (PreparedStatement statement = connection.prepareStatement("SELECT COUNT(*) FROM " + table);
 				ResultSet resultSet = statement.executeQuery()) {
@@ -317,7 +374,7 @@ class RowLevelSecurityIntegrationTest {
 		}
 	}
 
-	private int executeUpdate(Connection connection, String sql, UUID id) throws SQLException {
+	private int executeUpdate(Connection connection, String sql, Object id) throws SQLException {
 		try (PreparedStatement statement = connection.prepareStatement(sql)) {
 			statement.setObject(1, id);
 			return statement.executeUpdate();
@@ -354,7 +411,9 @@ class RowLevelSecurityIntegrationTest {
 			UUID staffInvitationA,
 			UUID staffInvitationB,
 			UUID passwordResetTokenA,
-			UUID passwordResetTokenB) {
+			UUID passwordResetTokenB,
+			String passwordResetRequestLimitA,
+			String passwordResetRequestLimitB) {
 	}
 
 }

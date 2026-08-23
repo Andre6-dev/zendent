@@ -73,6 +73,7 @@ public class AuthController {
 			@ApiResponse(responseCode = "400", description = "Invalid request payload", content = @io.swagger.v3.oas.annotations.media.Content),
 			@ApiResponse(responseCode = "403", description = "No Clinic is active — password reset needs a Clinic's subdomain", content = @io.swagger.v3.oas.annotations.media.Content),
 			@ApiResponse(responseCode = "404", description = "The host names no Clinic", content = @io.swagger.v3.oas.annotations.media.Content),
+			@ApiResponse(responseCode = "429", description = "The configured request limit was exceeded", content = @io.swagger.v3.oas.annotations.media.Content),
 	})
 	ForgotPasswordResponse forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
 		UUID clinicId = TenantContext.get()

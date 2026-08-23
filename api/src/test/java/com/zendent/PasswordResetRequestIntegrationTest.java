@@ -42,9 +42,13 @@ import com.jayway.jsonpath.JsonPath;
 import com.zendent.iam.internal.PasswordResetDeliveryRequested;
 import com.zendent.shared.tenancy.TenantContext;
 
-/** Issues #40 and #43: request password recovery without revealing Clinic membership. */
+/** Issues #40, #43, and #44: request password recovery without revealing Clinic membership. */
 @Import(TestcontainersConfiguration.class)
-@SpringBootTest(properties = "spring.datasource.hikari.maximum-pool-size=1")
+@SpringBootTest(properties = {
+		"spring.datasource.hikari.maximum-pool-size=1",
+		"zendent.password-reset.rate-limit.max-requests=2",
+		"zendent.password-reset.rate-limit.window=PT3S",
+})
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @RecordApplicationEvents
@@ -201,6 +205,50 @@ class PasswordResetRequestIntegrationTest {
 	}
 
 	@Test
+	void exceedingTheConfiguredLimitRefusesEveryMembershipStateWithoutResetSideEffects() throws Exception {
+		Clinic clinic = registerClinic();
+		String unknownEmail = "nobody-" + UUID.randomUUID() + "@example.com";
+
+		for (int permittedRequest = 0; permittedRequest < 2; permittedRequest++) {
+			requestReset(clinic.slug(), clinic.adminEmail(), "")
+				.andExpect(status().isAccepted());
+			requestReset(clinic.slug(), unknownEmail, "")
+				.andExpect(status().isAccepted());
+		}
+		long tokensBeforeRefusals = tokenCount();
+		long eventsBeforeRefusals = applicationEvents.stream(PasswordResetDeliveryRequested.class).count();
+
+		MvcResult known = requestReset(clinic.slug(), clinic.adminEmail(), "")
+			.andExpect(status().isTooManyRequests())
+			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+			.andReturn();
+		MvcResult unknown = requestReset(clinic.slug(), unknownEmail, "")
+			.andExpect(status().isTooManyRequests())
+			.andReturn();
+
+		assertThat(unknown.getResponse().getContentType()).isEqualTo(known.getResponse().getContentType());
+		assertThat(unknown.getResponse().getContentAsString()).isEqualTo(known.getResponse().getContentAsString());
+		assertThat(tokenCount()).isEqualTo(tokensBeforeRefusals);
+		assertThat(applicationEvents.stream(PasswordResetDeliveryRequested.class).count())
+			.isEqualTo(eventsBeforeRefusals);
+	}
+
+	@Test
+	void configuredRateLimitWindowAllowsRequestsAgainAfterItPasses() throws Exception {
+		Clinic clinic = registerClinic();
+		String unknownEmail = "nobody-" + UUID.randomUUID() + "@example.com";
+
+		requestReset(clinic.slug(), unknownEmail, "").andExpect(status().isAccepted());
+		requestReset(clinic.slug(), unknownEmail, "").andExpect(status().isAccepted());
+		requestReset(clinic.slug(), unknownEmail, "").andExpect(status().isTooManyRequests());
+
+		await().atMost(Duration.ofSeconds(5))
+			.pollDelay(Duration.ofSeconds(3))
+			.untilAsserted(() -> requestReset(clinic.slug(), unknownEmail, "")
+				.andExpect(status().isAccepted()));
+	}
+
+	@Test
 	void requestBodyCannotSelectAnotherClinic() throws Exception {
 		Clinic clinicA = registerClinic();
 		Clinic clinicB = registerClinic();
@@ -252,7 +300,7 @@ class PasswordResetRequestIntegrationTest {
 			.containsExactly("Authentication");
 		assertThat(JsonPath.<java.util.Map<String, ?>>read(
 				apiDocs, "$.paths./auth/forgot-password.post.responses").keySet())
-			.containsExactlyInAnyOrder("202", "400", "403", "404");
+			.containsExactlyInAnyOrder("202", "400", "403", "404", "429");
 		assertThat(JsonPath.<String>read(
 				apiDocs, "$.paths./auth/forgot-password.post.summary")).isNotBlank();
 	}
