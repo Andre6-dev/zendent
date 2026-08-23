@@ -14,12 +14,7 @@ interface SignInFormProps {
   onSignedIn: () => void | Promise<void>
 }
 
-/**
- * Field validation is driven by the same schema the server checks against, so
- * the two can never drift into disagreeing about what a complete submission
- * looks like. The form stopping a mistake early is a courtesy; the server
- * checking again is the rule, because nothing obliges a caller to use the form.
- */
+/** Field validation, driven by the same schema the server checks against. */
 function checkField(field: 'email' | 'password') {
   return (value: string) => {
     const result = credentialsSchema.shape[field].safeParse(value)

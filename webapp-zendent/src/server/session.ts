@@ -7,7 +7,12 @@
 export const ACCESS_COOKIE = 'zendent_access'
 export const REFRESH_COOKIE = 'zendent_refresh'
 
-/** The refresh token's own lifetime in the API, in seconds. */
+/**
+ * Mirrors the API's own `zendent.jwt.refresh-token-ttl` (`P30D` in
+ * `api/src/main/resources/application.yaml`). The sign-in response reports how
+ * long the *access* token lasts but says nothing about the refresh token, so
+ * this one is copied rather than read. Change it there, change it here.
+ */
 const REFRESH_MAX_AGE_SECONDS = 30 * 24 * 60 * 60
 
 export interface ApiSession {
@@ -40,7 +45,23 @@ function cookie(
   return attributes.join('; ')
 }
 
+/**
+ * Whether the browser reached us over https — which decides whether the session
+ * cookies may be marked `Secure`.
+ *
+ * The request's own URL is not enough. In production this application sits
+ * behind a proxy that terminates TLS (ADR 0017: one host, routed by path), so
+ * the request arriving here reads as plain http even though the browser used
+ * https. Trusting only the URL would ship every production session cookie
+ * without `Secure` — the exact failure this function exists to prevent — so
+ * the proxy's own `X-Forwarded-Proto` is what settles it when present.
+ */
 export function isSecureRequest(request: Request): boolean {
+  const forwarded = request.headers.get('x-forwarded-proto')
+  if (forwarded !== null && forwarded.length > 0) {
+    // A proxy may forward a chain: the client's own protocol is the first.
+    return forwarded.split(',')[0].trim().toLowerCase() === 'https'
+  }
   return new URL(request.url).protocol === 'https:'
 }
 

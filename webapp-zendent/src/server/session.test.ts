@@ -58,6 +58,36 @@ test('a cookie whose name merely ends the same is not mistaken for it', () => {
   expect(readCookie(request, ACCESS_COOKIE)).toBeUndefined()
 })
 
+test('a proxy that terminated TLS still counts as secure', () => {
+  // Production sits behind a proxy that terminates TLS, so the request arriving
+  // here reads as plain http. Trusting only the URL would ship every production
+  // session cookie without Secure.
+  const behindProxy = new Request('http://avicena.zendent.app/login', {
+    headers: { 'x-forwarded-proto': 'https' },
+  })
+
+  expect(isSecureRequest(behindProxy)).toBe(true)
+  for (const cookie of sessionCookies(session, isSecureRequest(behindProxy))) {
+    expect(cookie).toContain('Secure')
+  }
+})
+
+test('a forwarded chain is judged by the protocol the browser used', () => {
+  const chained = new Request('http://avicena.zendent.app/login', {
+    headers: { 'x-forwarded-proto': 'https, http' },
+  })
+
+  expect(isSecureRequest(chained)).toBe(true)
+})
+
+test('a proxy reporting plain http is taken at its word', () => {
+  const plain = new Request('http://avicena.localhost:3000/login', {
+    headers: { 'x-forwarded-proto': 'http' },
+  })
+
+  expect(isSecureRequest(plain)).toBe(false)
+})
+
 test('the scheme decides whether a request counts as secure', () => {
   expect(
     isSecureRequest(new Request('https://avicena.zendent.app/login')),

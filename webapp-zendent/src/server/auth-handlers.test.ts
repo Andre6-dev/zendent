@@ -156,6 +156,22 @@ test('wrong credentials are refused without saying which half was wrong', async 
   expect(body.message).not.toMatch(/password|email|user/i)
 })
 
+test('a failure that is not about the credentials does not blame them', async () => {
+  respondWith = () => ({
+    status: 500,
+    body: JSON.stringify({ status: 500, title: 'Internal Server Error' }),
+  })
+
+  const response = await handleSignIn(signInRequest(validCredentials))
+  const body = (await response.json()) as { message: string }
+
+  expect(response.status).toBe(500)
+  // Telling someone their credentials are invalid when the server fell over
+  // sends them off to rewrite a password that was never the problem.
+  expect(body.message).not.toMatch(/credential/i)
+  expect(body.message).toContain('could not sign you in right now')
+})
+
 test('an unresolvable Clinic address is passed through as not found', async () => {
   respondWith = () => ({
     status: 404,

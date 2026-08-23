@@ -14,12 +14,15 @@
  * overwrites it with the destination's own.
  */
 
-/** Set in development, where the API listens on a port of its own. */
-const API_PORT = 'ZENDENT_API_PORT'
+/**
+ * Name of the variable set in development, where the API listens on a port of
+ * its own. Holds the variable's name, not a port.
+ */
+const API_PORT_VARIABLE = 'ZENDENT_API_PORT'
 
 export function apiUrlFor(from: Request, path: string): string {
   const caller = new URL(from.url)
-  const port = process.env[API_PORT]
+  const port = process.env[API_PORT_VARIABLE]
 
   return port === undefined || port === ''
     ? `${caller.origin}/api${path}`
@@ -33,17 +36,12 @@ export interface ApiCall {
   body?: string
   /** The browser's request, whose host names the Clinic. */
   from: Request
-  /** Sent as a bearer token when the call needs a session. */
-  accessToken?: string
 }
 
 export function callApi(call: ApiCall): Promise<Response> {
   const headers = new Headers()
   if (call.body !== undefined) {
     headers.set('content-type', 'application/json')
-  }
-  if (call.accessToken !== undefined) {
-    headers.set('authorization', `Bearer ${call.accessToken}`)
   }
 
   return fetch(apiUrlFor(call.from, call.path), {

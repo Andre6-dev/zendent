@@ -18,9 +18,20 @@ const apiSessionSchema = z.object({
   refreshToken: z.string().min(1),
 })
 
-/** Never narrows to which half was wrong. */
+/**
+ * Used only when the API refuses the credentials and says nothing more. Never
+ * narrows to which half was wrong.
+ */
 const REFUSED = 'Invalid credentials'
 
+/** Used when something failed that has nothing to do with the credentials. */
+const UNAVAILABLE = 'We could not sign you in right now. Try again shortly.'
+
+/**
+ * The BFF answers its own form and nothing else, so it speaks a plain
+ * `{ message }` rather than the RFC 7807 the API uses between services. The
+ * message is always one a person can read, never a status code to decode.
+ */
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -44,8 +55,12 @@ export async function handleSignIn(request: Request): Promise<Response> {
   })
 
   if (!answer.ok) {
+    // The fallback depends on what actually failed. Describing a 500 as
+    // "Invalid credentials" sends a person off to rewrite a password that was
+    // never the problem.
+    const fallback = answer.status === 401 ? REFUSED : UNAVAILABLE
     return json(answer.status, {
-      message: await problemMessage(answer, REFUSED),
+      message: await problemMessage(answer, fallback),
     })
   }
 
