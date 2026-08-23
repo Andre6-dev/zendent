@@ -37,6 +37,8 @@ Both paths return the same shape. A controller that builds an error response by 
 
 Messages returned on an authentication failure stay generic. `"Invalid credentials"` never narrows to which half was wrong.
 
+**A listing returns `PageResponse<T>`, never Spring's `Page`.** Spring's shape is its internals and is not stable across versions; the envelope in `shared.domain` is the API's own contract.
+
 ## Module boundaries
 
 Each module is a top-level package under `com.zendent`, described in its `package-info.java`.

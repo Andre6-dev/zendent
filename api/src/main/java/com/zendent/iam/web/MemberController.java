@@ -1,6 +1,5 @@
 package com.zendent.iam.web;
 
-import java.util.List;
 import java.util.UUID;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -9,12 +8,15 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.zendent.iam.internal.ClinicMemberService;
+import com.zendent.shared.domain.PageResponse;
 
 /**
  * The Clinic's own staff directory. The Clinic is never in the path: it comes
@@ -33,7 +35,7 @@ public class MemberController {
 
 	@GetMapping
 	@Operation(summary = "List the Clinic's members",
-			description = "Every Membership in the caller's Clinic, with the role it grants.",
+			description = "Every Membership in the caller's Clinic, with the role it grants. Paginated.",
 			security = @SecurityRequirement(name = "bearerAuth"))
 	@ApiResponses({
 			@ApiResponse(responseCode = "200", description = "The Clinic's Memberships"),
@@ -41,8 +43,8 @@ public class MemberController {
 			@ApiResponse(responseCode = "403", description = "The session belongs to a different Clinic than this subdomain", content = @Content),
 			@ApiResponse(responseCode = "404", description = "The host names no Clinic", content = @Content),
 	})
-	List<MemberResponse> listMembers() {
-		return memberService.listMembers();
+	PageResponse<MemberResponse> listMembers(@PageableDefault(size = 50) Pageable pageable) {
+		return memberService.listMembers(pageable);
 	}
 
 	@GetMapping("/{memberId}")

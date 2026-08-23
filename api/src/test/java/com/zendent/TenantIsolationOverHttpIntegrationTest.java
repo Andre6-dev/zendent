@@ -163,7 +163,7 @@ class TenantIsolationOverHttpIntegrationTest {
 				.header("Authorization", clinic.bearer()))
 			.andExpect(status().isOk())
 			.andReturn().getResponse().getContentAsString();
-		return JsonPath.<List<String>>read(body, "$[*].id").getFirst();
+		return JsonPath.<List<String>>read(body, "$.content[*].id").getFirst();
 	}
 
 	private String invitationToken(Clinic clinic) throws Exception {

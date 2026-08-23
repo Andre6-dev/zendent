@@ -19,6 +19,12 @@ zendent:
   tenant:
     base-domain: zendent.app
     dev-header-override-enabled: false
+  cors:
+    allowed-origin-patterns:
+      # Every Clinic is its own origin, created at runtime, so the wildcard is
+      # the only way to express this. The apex is listed for onboarding.
+      - "https://*.zendent.app"
+      - "https://zendent.app"
 
 springdoc:
   swagger-ui:

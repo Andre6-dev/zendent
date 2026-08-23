@@ -61,10 +61,10 @@ class ClinicMemberListingIntegrationTest {
 
 		mockMvc.perform(get("/members").with(serverName(session.host())).header("Authorization", session.bearer()))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.length()").value(1))
-			.andExpect(jsonPath("$[0].email").value(session.email()))
-			.andExpect(jsonPath("$[0].role").value("ADMIN"))
-			.andExpect(jsonPath("$[0].fullName").value("Ada Admin"));
+			.andExpect(jsonPath("$.content.length()").value(1))
+			.andExpect(jsonPath("$.content[0].email").value(session.email()))
+			.andExpect(jsonPath("$.content[0].role").value("ADMIN"))
+			.andExpect(jsonPath("$.content[0].fullName").value("Ada Admin"));
 	}
 
 	@Test
@@ -82,7 +82,7 @@ class ClinicMemberListingIntegrationTest {
 			.andExpect(status().isOk())
 			.andReturn().getResponse().getContentAsString();
 
-		assertThat(JsonPath.<List<String>>read(body, "$[*].email"))
+		assertThat(JsonPath.<List<String>>read(body, "$.content[*].email"))
 			.containsExactly(clinicA.email())
 			.doesNotContain(clinicB.email());
 	}

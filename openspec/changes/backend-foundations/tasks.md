@@ -177,11 +177,15 @@ Spec: `multi-tenancy/spec.md` (Clinic Attribution, Clinic-Scoped Query Filtering
 
   **STATUS: DONE (#22). `anyRequest().permitAll()` is gone; only onboarding, login, invitation acceptance and the docs are public.**
 
-- [ ] **2.3.6** Shared value objects in `shared.domain`: `Money`, typed identifiers (e.g. `ClinicId`/`UserId` wrappers), `PageResponse<T>` pagination envelope.
+- [x] **2.3.6** Shared value objects in `shared.domain`: `Money`, typed identifiers (e.g. `ClinicId`/`UserId` wrappers), `PageResponse<T>` pagination envelope.
   Design: D1 package map. Proposal: PKG-2.3 scope.
 
-- [ ] **2.3.7** Wildcard-subdomain CORS config item: `CorsConfigurationSource` allowing `https://*.zendent.app` + the apex/onboarding origin, credentials enabled.
+  **STATUS: DONE. `Money` (BigDecimal at the currency's scale, refuses to mix currencies), `PageResponse<T>` (adopted by `GET /members`, which was left unpaginated in #23 precisely because this did not exist), and `ClinicId`/`UserId` over a `TypedId` interface. The typed identifiers are **not yet adopted**: `iam` still passes raw `UUID`, and retrofitting it is a wide refactor to decide separately.**
+
+- [x] **2.3.7** Wildcard-subdomain CORS config item: `CorsConfigurationSource` allowing `https://*.zendent.app` + the apex/onboarding origin, credentials enabled.
   Design: D3 CORS/frontend implication note.
+
+  **STATUS: DONE. `CorsConfigurationSource` from `zendent.cors.allowed-origin-patterns`, per profile so production cannot inherit a development origin. Origin *patterns* rather than origins: a literal `*` cannot be combined with credentials, and Clinics are created at runtime. `Authorization` is an allowed header, without which every authenticated cross-origin call would fail.**
 
 - [x] **2.3.8 — REPLACED: database-enforced Clinic-isolation gate**
   The planned repository-only test was replaced by the native `DataSource` RLS suite delivered in issues #8 and #10. A repository test cannot prove the database layer: it would stay green under Hibernate `@TenantId` even if every PostgreSQL policy were removed. The replacement uses the restricted application role, native SQL, catalog enumeration, transaction-local Clinic publication, and forced pool reuse. Repository/HTTP coverage remains in 2.3.9 for request and ORM behavior.
