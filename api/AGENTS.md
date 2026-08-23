@@ -57,6 +57,8 @@ Each module is a top-level package under `com.zendent`, described in its `packag
 
 Persistence is never mocked. Integration tests run against real PostgreSQL via Testcontainers and the real filter chain, and live in `com.zendent` as `*IntegrationTest`; unit tests sit beside the package they cover.
 
+Integration tests pin the connection pool to one connection, so that a tenant leaking across a reused connection shows up as a failure rather than as luck. That budget is a constraint on production code too: `REQUIRES_NEW` needs a second connection and deadlocks under it. When work must survive a rollback, reach for `noRollbackFor` instead.
+
 Anything asserting isolation proves it at the seam that can distinguish the two layers. A test that only exercises `@TenantId` passes with RLS disabled and proves half of ADR 0008 — reach for native SQL on a raw connection to prove the policy itself, as `RowLevelSecurityIntegrationTest` does.
 
 ## Style
