@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.zendent.iam.internal.ClinicLoginService;
+import com.zendent.iam.internal.PasswordResetRequestService;
 import com.zendent.iam.internal.RefreshTokenService;
 import com.zendent.iam.internal.ClinicOnboardingService;
 import com.zendent.iam.mapper.ClinicOnboardingMapper;
@@ -31,15 +32,36 @@ public class AuthController {
 
 	private final ClinicOnboardingService onboardingService;
 	private final ClinicLoginService loginService;
+	private final PasswordResetRequestService passwordResetRequestService;
 	private final RefreshTokenService refreshTokenService;
 	private final ClinicOnboardingMapper mapper;
 
 	AuthController(ClinicOnboardingService onboardingService, ClinicLoginService loginService,
+			PasswordResetRequestService passwordResetRequestService,
 			RefreshTokenService refreshTokenService, ClinicOnboardingMapper mapper) {
 		this.onboardingService = onboardingService;
 		this.loginService = loginService;
+		this.passwordResetRequestService = passwordResetRequestService;
 		this.refreshTokenService = refreshTokenService;
 		this.mapper = mapper;
+	}
+
+	@PostMapping("/forgot-password")
+	@ResponseStatus(HttpStatus.ACCEPTED)
+	@Operation(summary = "Request a password reset",
+			description = "Issues a reset message for an active member of the Clinic resolved from the "
+					+ "subdomain. The response never reveals whether that account exists.")
+	@ApiResponses({
+			@ApiResponse(responseCode = "202", description = "Request accepted whether or not the account exists"),
+			@ApiResponse(responseCode = "400", description = "Invalid request payload", content = @io.swagger.v3.oas.annotations.media.Content),
+			@ApiResponse(responseCode = "403", description = "No Clinic is active — password reset needs a Clinic's subdomain", content = @io.swagger.v3.oas.annotations.media.Content),
+			@ApiResponse(responseCode = "404", description = "The host names no Clinic", content = @io.swagger.v3.oas.annotations.media.Content),
+	})
+	ForgotPasswordResponse forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+		UUID clinicId = TenantContext.get()
+			.orElseThrow(() -> new AccessDeniedException(ErrorMessages.PASSWORD_RESET_REQUIRES_CLINIC_HOST));
+		passwordResetRequestService.request(request.email(), clinicId);
+		return new ForgotPasswordResponse(ErrorMessages.PASSWORD_RESET_REQUEST_ACCEPTED);
 	}
 
 	@PostMapping("/register")

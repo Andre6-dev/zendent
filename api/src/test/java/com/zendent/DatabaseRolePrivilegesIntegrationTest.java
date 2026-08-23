@@ -28,7 +28,7 @@ class DatabaseRolePrivilegesIntegrationTest {
 				SELECT tableowner
 				FROM pg_tables
 				WHERE schemaname = 'public'
-				  AND tablename IN ('membership', 'refresh_token', 'staff_invitation')
+				  AND tablename IN ('membership', 'password_reset_token', 'refresh_token', 'staff_invitation')
 				ORDER BY tablename
 				""", String.class);
 
@@ -37,7 +37,7 @@ class DatabaseRolePrivilegesIntegrationTest {
 				.containsEntry("rolsuper", false)
 				.containsEntry("rolbypassrls", false);
 		assertThat(clinicScopedTableOwners)
-				.hasSize(3)
+				.hasSize(4)
 				.containsOnly("zendent_owner");
 	}
 

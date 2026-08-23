@@ -42,6 +42,12 @@ public final class ErrorMessages {
 	public static final String LOGIN_REQUIRES_CLINIC_HOST =
 			"Login is only available on a Clinic's subdomain";
 
+	public static final String PASSWORD_RESET_REQUIRES_CLINIC_HOST =
+			"Password reset is only available on a Clinic's subdomain";
+
+	public static final String PASSWORD_RESET_REQUEST_ACCEPTED =
+			"If an account exists for that email, a password reset link will be sent.";
+
 	private ErrorMessages() {
 	}
 

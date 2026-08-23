@@ -60,6 +60,8 @@ public class SecurityConfig {
 	private static final String[] PUBLIC_ENDPOINTS = {
 			"/auth/register",
 			"/auth/login",
+			// A person requesting recovery cannot have a session by definition.
+			"/auth/forgot-password",
 			// The access token it replaces may already have expired, so this
 			// cannot require one.
 			"/auth/refresh",

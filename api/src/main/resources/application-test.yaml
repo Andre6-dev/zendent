@@ -20,6 +20,8 @@ zendent:
     allowed-origin-patterns:
       - "http://localhost:[*]"
       - "http://*.localhost:[*]"
+  password-reset:
+    link-template: "http://%s.localhost:3000/reset-password?token=%s"
 
 springdoc:
   swagger-ui:

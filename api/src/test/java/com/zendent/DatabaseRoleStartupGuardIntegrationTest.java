@@ -38,7 +38,8 @@ class DatabaseRoleStartupGuardIntegrationTest {
 				.hasMessageContaining("Database role 'zendent_owner'")
 				.hasMessageContaining("SUPERUSER")
 				.hasMessageContaining("BYPASSRLS")
-				.hasMessageContaining("owns Clinic-scoped tables [membership, refresh_token, staff_invitation]");
+				.hasMessageContaining(
+						"owns Clinic-scoped tables [membership, password_reset_token, refresh_token, staff_invitation]");
 	}
 
 	@Test

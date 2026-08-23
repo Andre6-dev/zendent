@@ -11,6 +11,10 @@ zendent:
     # An invitation that stays redeemable forever is a permanent key to a Clinic
     # sitting in someone's inbox.
     ttl: P7D
+  mail:
+    from: noreply@zendent.app
+  password-reset:
+    link-template: "https://%s.zendent.app/reset-password?token=%s"
 
 spring:
   application:

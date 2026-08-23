@@ -69,6 +69,7 @@ class RowLevelSecurityIntegrationTest {
 				new ClinicScopedRows(
 						UUID.randomUUID(), UUID.randomUUID(),
 						UUID.randomUUID(), UUID.randomUUID(),
+						UUID.randomUUID(), UUID.randomUUID(),
 						UUID.randomUUID(), UUID.randomUUID()));
 
 		ownerJdbcTemplate.update("""
@@ -94,6 +95,14 @@ class RowLevelSecurityIntegrationTest {
 				"token-" + fixture.rows().staffInvitationA(), userA,
 				fixture.rows().staffInvitationB(), clinicB, "invite-b@example.com", roleId,
 				"token-" + fixture.rows().staffInvitationB(), userB);
+		ownerJdbcTemplate.update("""
+				INSERT INTO password_reset_token (id, clinic_id, user_id, token_hash)
+				VALUES (?, ?, ?, ?), (?, ?, ?, ?)
+				""",
+				fixture.rows().passwordResetTokenA(), clinicA, userA,
+				"reset-" + fixture.rows().passwordResetTokenA(),
+				fixture.rows().passwordResetTokenB(), clinicB, userB,
+				"reset-" + fixture.rows().passwordResetTokenB());
 	}
 
 	@Test
@@ -133,10 +142,13 @@ class RowLevelSecurityIntegrationTest {
 					.containsExactly(fixture.rows().refreshTokenA());
 			assertThat(queryIds(connection, "staff_invitation"))
 					.containsExactly(fixture.rows().staffInvitationA());
+			assertThat(queryIds(connection, "password_reset_token"))
+					.containsExactly(fixture.rows().passwordResetTokenA());
 
 			assertThat(countById(connection, "membership", fixture.rows().membershipB())).isZero();
 			assertThat(countById(connection, "refresh_token", fixture.rows().refreshTokenB())).isZero();
 			assertThat(countById(connection, "staff_invitation", fixture.rows().staffInvitationB())).isZero();
+			assertThat(countById(connection, "password_reset_token", fixture.rows().passwordResetTokenB())).isZero();
 		}
 	}
 
@@ -146,6 +158,7 @@ class RowLevelSecurityIntegrationTest {
 			assertThat(queryIds(connection, "membership")).isEmpty();
 			assertThat(queryIds(connection, "refresh_token")).isEmpty();
 			assertThat(queryIds(connection, "staff_invitation")).isEmpty();
+			assertThat(queryIds(connection, "password_reset_token")).isEmpty();
 		}
 
 		assertInsertRejected(null, """
@@ -162,6 +175,10 @@ class RowLevelSecurityIntegrationTest {
 				VALUES (?, ?, 'missing@example.com', ?, ?, 'PENDING', ?, now() + interval '1 day')
 				""", UUID.randomUUID(), fixture.clinicA(), fixture.roleId(),
 				"missing-" + UUID.randomUUID(), fixture.spareUser());
+		assertInsertRejected(null, """
+				INSERT INTO password_reset_token (id, clinic_id, user_id, token_hash)
+				VALUES (?, ?, ?, ?)
+				""", UUID.randomUUID(), fixture.clinicA(), fixture.spareUser(), "missing-" + UUID.randomUUID());
 	}
 
 	@Test
@@ -180,6 +197,10 @@ class RowLevelSecurityIntegrationTest {
 				VALUES (?, ?, 'wrong@example.com', ?, ?, 'PENDING', ?, now() + interval '1 day')
 				""", UUID.randomUUID(), fixture.clinicB(), fixture.roleId(),
 				"wrong-" + UUID.randomUUID(), fixture.spareUser());
+		assertInsertRejected(fixture.clinicA(), """
+				INSERT INTO password_reset_token (id, clinic_id, user_id, token_hash)
+				VALUES (?, ?, ?, ?)
+				""", UUID.randomUUID(), fixture.clinicB(), fixture.spareUser(), "wrong-" + UUID.randomUUID());
 	}
 
 	@Test
@@ -194,6 +215,9 @@ class RowLevelSecurityIntegrationTest {
 			assertThat(executeUpdate(connection,
 					"UPDATE staff_invitation SET status = 'EXPIRED' WHERE id = ?", fixture.rows().staffInvitationB()))
 					.isZero();
+			assertThat(executeUpdate(connection,
+					"UPDATE password_reset_token SET token_hash = 'changed' WHERE id = ?",
+					fixture.rows().passwordResetTokenB())).isZero();
 
 			assertThat(executeUpdate(connection,
 					"DELETE FROM membership WHERE id = ?", fixture.rows().membershipB())).isZero();
@@ -201,6 +225,8 @@ class RowLevelSecurityIntegrationTest {
 					"DELETE FROM refresh_token WHERE id = ?", fixture.rows().refreshTokenB())).isZero();
 			assertThat(executeUpdate(connection,
 					"DELETE FROM staff_invitation WHERE id = ?", fixture.rows().staffInvitationB())).isZero();
+			assertThat(executeUpdate(connection,
+					"DELETE FROM password_reset_token WHERE id = ?", fixture.rows().passwordResetTokenB())).isZero();
 		}
 
 		assertThat(ownerJdbcTemplate.queryForObject(
@@ -212,6 +238,10 @@ class RowLevelSecurityIntegrationTest {
 		assertThat(ownerJdbcTemplate.queryForObject(
 				"SELECT status FROM staff_invitation WHERE id = ?", String.class,
 				fixture.rows().staffInvitationB())).isEqualTo("PENDING");
+		assertThat(ownerJdbcTemplate.queryForObject(
+				"SELECT token_hash FROM password_reset_token WHERE id = ?", String.class,
+				fixture.rows().passwordResetTokenB()))
+				.isEqualTo("reset-" + fixture.rows().passwordResetTokenB());
 	}
 
 	@Test
@@ -322,7 +352,9 @@ class RowLevelSecurityIntegrationTest {
 			UUID refreshTokenA,
 			UUID refreshTokenB,
 			UUID staffInvitationA,
-			UUID staffInvitationB) {
+			UUID staffInvitationB,
+			UUID passwordResetTokenA,
+			UUID passwordResetTokenB) {
 	}
 
 }
