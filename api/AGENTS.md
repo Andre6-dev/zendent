@@ -50,7 +50,8 @@ Each module is a top-level package under `com.zendent`, described in its `packag
 
 - Schema changes are Flyway migrations under `db/migration/`. `ddl-auto` is `validate`; Hibernate never writes DDL.
 - Entities expose record-style accessors — `clinic.id()`, `clinic.slug()` — with no `get` prefix. A JPA no-arg constructor is `protected`; the real constructor takes what the invariant requires.
-- DTOs are records, mapped with MapStruct `@Mapper(componentModel = "spring", unmappedTargetPolicy = ERROR)`.
+- DTOs are records. Mapping *into* an entity is MapStruct's job — `@Mapper(componentModel = "spring", unmappedTargetPolicy = ERROR)` — because it writes through constructors.
+- Mapping *out of* an entity is written by hand. MapStruct's default accessor strategy reads `getX()` and these entities expose `x()`; teaching it otherwise needs an `AccessorNamingStrategy` on the annotation-processor path, which must be compiled before the processor runs and so cannot live in this module. Reach for a plain `@Component` in `mapper/`, as `MemberMapper` does.
 
 ## Tests
 

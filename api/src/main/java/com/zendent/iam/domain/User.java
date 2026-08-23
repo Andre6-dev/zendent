@@ -57,6 +57,10 @@ public class User {
 		return email;
 	}
 
+	public String fullName() {
+		return fullName;
+	}
+
 	public String passwordHash() {
 		return passwordHash;
 	}
