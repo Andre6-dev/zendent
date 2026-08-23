@@ -23,13 +23,14 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import com.jayway.jsonpath.JsonPath;
 import com.zendent.shared.tenancy.TenantContext;
 
-/** Issue #41: redeem a password reset link and choose a new password. */
+/** Issues #41–#43: redeem a password reset without revealing token state. */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest(properties = "spring.datasource.hikari.maximum-pool-size=1")
 @AutoConfigureMockMvc
@@ -145,6 +146,38 @@ class PasswordResetCompletionIntegrationTest {
 	}
 
 	@Test
+	void everyNonRedeemableTokenHasTheSameRefusal() throws Exception {
+		Clinic clinic = registerClinic();
+		String expiredToken = "expired-" + UUID.randomUUID();
+		String usedToken = "used-" + UUID.randomUUID();
+		insertResetToken(clinic, expiredToken);
+		insertResetToken(clinic, usedToken);
+		ownerJdbcTemplate.update("""
+				UPDATE password_reset_token
+				SET created_at = now() - interval '2 hours'
+				WHERE token_hash = ?
+				""", sha256(expiredToken));
+		ownerJdbcTemplate.update("""
+				UPDATE password_reset_token
+				SET used_at = now()
+				WHERE token_hash = ?
+				""", sha256(usedToken));
+
+		MvcResult unknown = refusedReset(clinic, "unknown-" + UUID.randomUUID());
+		MvcResult expired = refusedReset(clinic, expiredToken);
+		MvcResult used = refusedReset(clinic, usedToken);
+
+		assertThat(expired.getResponse().getContentType())
+			.isEqualTo(unknown.getResponse().getContentType());
+		assertThat(used.getResponse().getContentType())
+			.isEqualTo(unknown.getResponse().getContentType());
+		assertThat(expired.getResponse().getContentAsString())
+			.isEqualTo(unknown.getResponse().getContentAsString());
+		assertThat(used.getResponse().getContentAsString())
+			.isEqualTo(unknown.getResponse().getContentAsString());
+	}
+
+	@Test
 	void anInvalidNewPasswordListsItsFailureAndLeavesTheTokenUsable() throws Exception {
 		Clinic clinic = registerClinic();
 		String token = "reset-" + UUID.randomUUID();
@@ -209,6 +242,13 @@ class PasswordResetCompletionIntegrationTest {
 			.content("""
 					{"token":"%s","newPassword":"%s"}
 					""".formatted(token, newPassword));
+	}
+
+	private MvcResult refusedReset(Clinic clinic, String token) throws Exception {
+		return mockMvc.perform(resetPassword(clinic, token, NEW_PASSWORD))
+			.andExpect(status().isBadRequest())
+			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+			.andReturn();
 	}
 
 	private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder login(

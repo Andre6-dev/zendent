@@ -2,6 +2,7 @@ package com.zendent;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -41,7 +42,7 @@ import com.jayway.jsonpath.JsonPath;
 import com.zendent.iam.internal.PasswordResetDeliveryRequested;
 import com.zendent.shared.tenancy.TenantContext;
 
-/** Issue #40: request a password reset and receive it through Mailpit. */
+/** Issues #40 and #43: request password recovery without revealing Clinic membership. */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest(properties = "spring.datasource.hikari.maximum-pool-size=1")
 @AutoConfigureMockMvc
@@ -128,8 +129,50 @@ class PasswordResetRequestIntegrationTest {
 	}
 
 	@Test
-	void unknownAddressHasTheSameResponseWithoutAStoredTokenOrDeliveryEvent() throws Exception {
+	void responseIsProducedWhileDeliveryIsStillPending() throws Exception {
 		Clinic clinic = registerClinic();
+		mailpitContainer.getDockerClient().pauseContainerCmd(mailpitContainer.getContainerId()).exec();
+		try {
+			MvcResult response = assertTimeoutPreemptively(Duration.ofSeconds(5),
+					() -> requestReset(clinic.slug(), clinic.adminEmail(), "")
+						.andExpect(status().isAccepted())
+						.andExpect(jsonPath("$.message").value(GENERIC_RESPONSE))
+						.andReturn());
+
+			UUID resetTokenId = ownerJdbcTemplate.queryForObject("""
+					SELECT id
+					FROM password_reset_token
+					WHERE user_id = ?
+					""", UUID.class, clinic.adminId());
+			Integer pendingDeliveries = ownerJdbcTemplate.queryForObject("""
+					SELECT count(*)
+					FROM event_publication
+					WHERE event_type LIKE '%PasswordResetDeliveryRequested'
+					  AND serialized_event LIKE ?
+					  AND completion_date IS NULL
+					""", Integer.class, "%" + resetTokenId + "%");
+
+			assertThat(response.getResponse().getStatus()).isEqualTo(202);
+			assertThat(pendingDeliveries).isOne();
+		}
+		finally {
+			mailpitContainer.getDockerClient().unpauseContainerCmd(mailpitContainer.getContainerId()).exec();
+		}
+		await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
+			assertThat(ownerJdbcTemplate.queryForObject("""
+					SELECT count(*)
+					FROM event_publication
+					WHERE event_type LIKE '%PasswordResetDeliveryRequested'
+					  AND completion_date IS NULL
+					""", Integer.class)).isZero());
+	}
+
+	@Test
+	void everyMembershipStateHasTheSameResponseWhileOnlyAnActiveMemberGetsAReset() throws Exception {
+		Clinic clinic = registerClinic();
+		Clinic nonMember = registerClinic();
+		Clinic revokedMember = registerClinic();
+		addRevokedMembership(clinic, revokedMember.adminId());
 
 		MvcResult known = requestReset(clinic.slug(), clinic.adminEmail(), "")
 			.andExpect(status().isAccepted())
@@ -137,12 +180,21 @@ class PasswordResetRequestIntegrationTest {
 		long storedAfterKnownRequest = tokenCount();
 		long eventsAfterKnownRequest = applicationEvents.stream(PasswordResetDeliveryRequested.class).count();
 
-		MvcResult unknown = requestReset(clinic.slug(), "nobody-" + UUID.randomUUID() + "@example.com", "")
-			.andExpect(status().isAccepted())
-			.andReturn();
+		MvcResult[] hiddenMembershipStates = {
+			requestReset(clinic.slug(), "nobody-" + UUID.randomUUID() + "@example.com", "")
+				.andExpect(status().isAccepted()).andReturn(),
+			requestReset(clinic.slug(), nonMember.adminEmail(), "")
+				.andExpect(status().isAccepted()).andReturn(),
+			requestReset(clinic.slug(), revokedMember.adminEmail(), "")
+				.andExpect(status().isAccepted()).andReturn(),
+		};
 
-		assertThat(unknown.getResponse().getContentAsString())
-			.isEqualTo(known.getResponse().getContentAsString());
+		for (MvcResult hiddenMembershipState : hiddenMembershipStates) {
+			assertThat(hiddenMembershipState.getResponse().getContentType())
+				.isEqualTo(known.getResponse().getContentType());
+			assertThat(hiddenMembershipState.getResponse().getContentAsString())
+				.isEqualTo(known.getResponse().getContentAsString());
+		}
 		assertThat(tokenCount()).isEqualTo(storedAfterKnownRequest);
 		assertThat(applicationEvents.stream(PasswordResetDeliveryRequested.class).count())
 			.isEqualTo(eventsAfterKnownRequest);
@@ -169,6 +221,8 @@ class PasswordResetRequestIntegrationTest {
 	@Test
 	void requestRequiresAResolvableClinicHostAndValidEmail() throws Exception {
 		Clinic clinic = registerClinic();
+		long tokensBeforeRequests = tokenCount();
+		long eventsBeforeRequests = applicationEvents.stream(PasswordResetDeliveryRequested.class).count();
 
 		mockMvc.perform(post("/auth/forgot-password").with(serverName("localhost"))
 				.contentType(MediaType.APPLICATION_JSON)
@@ -182,8 +236,9 @@ class PasswordResetRequestIntegrationTest {
 			.andExpect(status().isBadRequest())
 			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
 
-		assertThat(tokenCount()).isZero();
-		assertThat(applicationEvents.stream(PasswordResetDeliveryRequested.class)).isEmpty();
+		assertThat(tokenCount()).isEqualTo(tokensBeforeRequests);
+		assertThat(applicationEvents.stream(PasswordResetDeliveryRequested.class).count())
+			.isEqualTo(eventsBeforeRequests);
 	}
 
 	@Test
@@ -228,6 +283,13 @@ class PasswordResetRequestIntegrationTest {
 
 	private long tokenCount() {
 		return ownerJdbcTemplate.queryForObject("SELECT count(*) FROM password_reset_token", Long.class);
+	}
+
+	private void addRevokedMembership(Clinic clinic, UUID userId) {
+		ownerJdbcTemplate.update("""
+				INSERT INTO membership (clinic_id, user_id, role_id, status)
+				SELECT ?, ?, id, 'REVOKED' FROM role WHERE code = 'DENTIST'
+				""", clinic.id(), userId);
 	}
 
 	private Clinic registerClinic() throws Exception {

@@ -77,7 +77,8 @@ public class Membership {
 	}
 
 	public enum Status {
-		ACTIVE
+		ACTIVE,
+		REVOKED
 	}
 
 }
