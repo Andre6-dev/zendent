@@ -1,11 +1,7 @@
 package com.zendent.iam.internal;
 
-import java.security.MessageDigest;
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.HexFormat;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -33,21 +29,21 @@ import com.zendent.shared.domain.ErrorMessages;
 @Service
 public class RefreshTokenService {
 
-	private static final SecureRandom RANDOM = new SecureRandom();
-
 	private final RefreshTokenRepository refreshTokenRepository;
 	private final MembershipRepository membershipRepository;
 	private final RefreshTokenLineage lineage;
 	private final AccessTokenIssuer accessTokenIssuer;
+	private final SingleUseSecretPolicy secretPolicy;
 	private final Duration timeToLive;
 
 	RefreshTokenService(RefreshTokenRepository refreshTokenRepository, MembershipRepository membershipRepository,
-			RefreshTokenLineage lineage, AccessTokenIssuer accessTokenIssuer,
+			RefreshTokenLineage lineage, AccessTokenIssuer accessTokenIssuer, SingleUseSecretPolicy secretPolicy,
 			@Value("${zendent.jwt.refresh-token-ttl}") Duration timeToLive) {
 		this.refreshTokenRepository = refreshTokenRepository;
 		this.membershipRepository = membershipRepository;
 		this.lineage = lineage;
 		this.accessTokenIssuer = accessTokenIssuer;
+		this.secretPolicy = secretPolicy;
 		this.timeToLive = timeToLive;
 	}
 
@@ -65,7 +61,7 @@ public class RefreshTokenService {
 	@Transactional(noRollbackFor = BadCredentialsException.class)
 	public LoginResponse rotate(String presented) {
 		Instant now = Instant.now();
-		RefreshToken current = refreshTokenRepository.findByTokenHash(hash(presented))
+		RefreshToken current = refreshTokenRepository.findByTokenHash(secretPolicy.hash(presented))
 			.orElseThrow(() -> new BadCredentialsException(ErrorMessages.INVALID_REFRESH_TOKEN));
 
 		if (current.isSpent()) {
@@ -84,16 +80,16 @@ public class RefreshTokenService {
 
 	@Transactional
 	public void revoke(String presented) {
-		refreshTokenRepository.findByTokenHash(hash(presented))
+		refreshTokenRepository.findByTokenHash(secretPolicy.hash(presented))
 			.ifPresent(token -> token.revoke(Instant.now()));
 	}
 
 	private LoginResponse issue(Membership membership, UUID rotatedFrom) {
 		AccessTokenIssuer.AccessToken access = accessTokenIssuer.issue(membership);
-		String refreshToken = newSecret();
+		SingleUseSecretPolicy.MintedSecret refreshToken = secretPolicy.mint();
 		refreshTokenRepository.save(new RefreshToken(membership.clinicId(), membership.user().id(),
-				hash(refreshToken), access.jti(), Instant.now().plus(timeToLive), rotatedFrom));
-		return new LoginResponse(access.value(), "Bearer", access.expiresInSeconds(), refreshToken);
+				refreshToken.hash(), access.jti(), Instant.now().plus(timeToLive), rotatedFrom));
+		return new LoginResponse(access.value(), "Bearer", access.expiresInSeconds(), refreshToken.value());
 	}
 
 	/**
@@ -105,22 +101,6 @@ public class RefreshTokenService {
 		return membershipRepository.findByUserId(token.userId())
 			.filter(membership -> membership.status() == Membership.Status.ACTIVE)
 			.orElseThrow(() -> new BadCredentialsException(ErrorMessages.INVALID_REFRESH_TOKEN));
-	}
-
-	private static String newSecret() {
-		byte[] bytes = new byte[32];
-		RANDOM.nextBytes(bytes);
-		return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-	}
-
-	private static String hash(String token) {
-		try {
-			return HexFormat.of().formatHex(
-					MessageDigest.getInstance("SHA-256").digest(token.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
-		}
-		catch (java.security.NoSuchAlgorithmException ex) {
-			throw new IllegalStateException("SHA-256 is required by every JVM", ex);
-		}
 	}
 
 }

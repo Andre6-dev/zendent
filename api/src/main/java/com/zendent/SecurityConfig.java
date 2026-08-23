@@ -1,6 +1,7 @@
 package com.zendent;
 
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -130,6 +131,11 @@ public class SecurityConfig {
 	@Bean
 	PasswordEncoder passwordEncoder() {
 		return new BCryptPasswordEncoder();
+	}
+
+	@Bean
+	SecureRandom secureRandom() {
+		return new SecureRandom();
 	}
 
 	@Bean

@@ -1,11 +1,7 @@
 package com.zendent.iam.internal;
 
-import java.security.MessageDigest;
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.HexFormat;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -39,24 +35,24 @@ import com.zendent.shared.domain.NotFoundException;
 @Service
 public class StaffInvitationService {
 
-	private static final SecureRandom RANDOM = new SecureRandom();
-
 	private final StaffInvitationRepository invitationRepository;
 	private final MembershipRepository membershipRepository;
 	private final UserRepository userRepository;
 	private final RoleRepository roleRepository;
 	private final PasswordEncoder passwordEncoder;
+	private final SingleUseSecretPolicy secretPolicy;
 	private final Duration timeToLive;
 
 	StaffInvitationService(StaffInvitationRepository invitationRepository,
 			MembershipRepository membershipRepository, UserRepository userRepository,
-			RoleRepository roleRepository, PasswordEncoder passwordEncoder,
+			RoleRepository roleRepository, PasswordEncoder passwordEncoder, SingleUseSecretPolicy secretPolicy,
 			@Value("${zendent.invitation.ttl}") Duration timeToLive) {
 		this.invitationRepository = invitationRepository;
 		this.membershipRepository = membershipRepository;
 		this.userRepository = userRepository;
 		this.roleRepository = roleRepository;
 		this.passwordEncoder = passwordEncoder;
+		this.secretPolicy = secretPolicy;
 		this.timeToLive = timeToLive;
 	}
 
@@ -71,19 +67,19 @@ public class StaffInvitationService {
 		}
 		Role role = roleRepository.findByCode(request.role())
 			.orElseThrow(() -> new IllegalStateException("Role " + request.role() + " is not configured"));
-		String token = newSecret();
+		SingleUseSecretPolicy.MintedSecret token = secretPolicy.mint();
 
 		StaffInvitation invitation = invitationRepository.save(new StaffInvitation(
-				clinicId, email, role, hash(token), invitedBy, Instant.now().plus(timeToLive)));
+				clinicId, email, role, token.hash(), invitedBy, Instant.now().plus(timeToLive)));
 
 		return new InvitationResponse(invitation.id(), invitation.email(), role.code().name(),
-				invitation.expiresAt(), token);
+				invitation.expiresAt(), token.value());
 	}
 
 	@Transactional
 	public void accept(String token, InvitationAcceptance acceptance) {
 		Instant now = Instant.now();
-		StaffInvitation invitation = invitationRepository.findByTokenHash(hash(token))
+		StaffInvitation invitation = invitationRepository.findByTokenHash(secretPolicy.hash(token))
 			.filter(candidate -> candidate.isRedeemableAt(now))
 			.orElseThrow(() -> new NotFoundException(ErrorMessages.INVITATION_NOT_REDEEMABLE));
 
@@ -110,22 +106,6 @@ public class StaffInvitationService {
 
 	private static String normalize(String value) {
 		return value.trim().toLowerCase(Locale.ROOT);
-	}
-
-	private static String newSecret() {
-		byte[] bytes = new byte[32];
-		RANDOM.nextBytes(bytes);
-		return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-	}
-
-	private static String hash(String token) {
-		try {
-			return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-				.digest(token.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
-		}
-		catch (java.security.NoSuchAlgorithmException ex) {
-			throw new IllegalStateException("SHA-256 is required by every JVM", ex);
-		}
 	}
 
 }
