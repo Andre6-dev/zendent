@@ -20,6 +20,10 @@ zendent:
   tenant:
     base-domain: localhost
     dev-header-override-enabled: true
+  cors:
+    allowed-origin-patterns:
+      - "http://localhost:[*]"
+      - "http://*.localhost:[*]"
 
 springdoc:
   swagger-ui:

@@ -31,6 +31,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 
 import com.zendent.shared.domain.ErrorMessages;
@@ -75,10 +76,12 @@ public class SecurityConfig {
 	SecurityFilterChain securityFilterChain(HttpSecurity http, JwtDecoder jwtDecoder,
 			AuthenticationEntryPoint authenticationEntryPoint, AccessDeniedHandler accessDeniedHandler,
 			SubdomainClinicResolutionFilter subdomainClinicResolutionFilter,
-			AuthenticatedClinicFilter authenticatedClinicFilter)
+			AuthenticatedClinicFilter authenticatedClinicFilter,
+			CorsConfigurationSource corsConfigurationSource)
 			throws Exception {
 		http
 			.csrf(AbstractHttpConfigurer::disable)
+			.cors(cors -> cors.configurationSource(corsConfigurationSource))
 			// The Clinic is resolved from the host before authentication, so a
 			// public request (onboarding, login) is already scoped when it runs.
 			.addFilterBefore(subdomainClinicResolutionFilter, BearerTokenAuthenticationFilter.class)
