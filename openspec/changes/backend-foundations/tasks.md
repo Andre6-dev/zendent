@@ -92,36 +92,54 @@ Spec: `backend-platform/spec.md` (Local Environment Bootstrap, Database Schema B
 
 Spec: `iam-auth/spec.md` (Clinic Onboarding, Login, Token Refresh, Logout, Staff Invitation, Protected Endpoint Access Control). Design: D2 (entity annotation only), D3, D4, D5.
 
-- [ ] **2.2.1** JPA entities + repositories: `Clinic`, `User` (`app_user`), `Role`, `Membership` (`clinicId` annotated `@TenantId` per D2), `RefreshToken`, `StaffInvitation`.
+- [x] **2.2.1** JPA entities + repositories: `Clinic`, `User` (`app_user`), `Role`, `Membership` (`clinicId` annotated `@TenantId` per D2), `RefreshToken`, `StaffInvitation`.
   Spec: prerequisite for all iam-auth scenarios. Design: D4 (tables), D2 (`@TenantId` placement).
   **Soft cross-dependency:** `@TenantId` compiles independently of the resolver, but it is only *functionally* isolating once `ClinicTenantIdentifierResolver` (2.3.2) is wired — call this out at PR review time, not a compile blocker.
 
-- [ ] **2.2.2** DTOs (records) + mappers for Clinic/User/Membership/invitation request-response shapes, per the 2.1.1 verdict (MapStruct `@Mapper(componentModel="spring", unmappedTargetPolicy=ERROR)` or hand-written fallback).
+  **STATUS: DONE (#12, #21, #24, #25). All six entities exist; `Membership.clinicId`, `RefreshToken.clinicId` and `StaffInvitation.clinicId` carry `@TenantId`.**
+
+- [x] **2.2.2** DTOs (records) + mappers for Clinic/User/Membership/invitation request-response shapes, per the 2.1.1 verdict (MapStruct `@Mapper(componentModel="spring", unmappedTargetPolicy=ERROR)` or hand-written fallback).
   Design: D5.
 
-- [ ] **2.2.3** `POST /auth/register` (apex/onboarding host, public): create `Clinic` + admin `User` + admin `Membership`; publish `ClinicCreatedEvent`; 409 on duplicate identifier; 400 `ProblemDetail` on validation failure.
+  **STATUS: DONE. MapStruct maps *into* entities. Mapping *out of* one is hand-written: MapStruct reads `getX()` and these entities expose `x()`, and the fix needs an `AccessorNamingStrategy` compiled ahead of the processor — a separate module. See `api/AGENTS.md`.**
+
+- [x] **2.2.3** `POST /auth/register` (apex/onboarding host, public): create `Clinic` + admin `User` + admin `Membership`; publish `ClinicCreatedEvent`; 409 on duplicate identifier; 400 `ProblemDetail` on validation failure.
   Spec: iam-auth/Clinic Onboarding (all 3 scenarios). Design: D3 endpoints table, D6.
 
-- [ ] **2.2.4** JWT token service: build access JWT (`sub`, `clinic_id`, `roles`, `email`, `iss`, `iat`, `exp`, `jti`) via `NimbusJwtEncoder` (from 2.1.7's bean); `BCryptPasswordEncoder` wiring for hash/verify.
+  **STATUS: DONE (#12). Guarded by "no Clinic active" rather than by host classification, so the development override cannot smuggle one in.**
+
+- [x] **2.2.4** JWT token service: build access JWT (`sub`, `clinic_id`, `roles`, `email`, `iss`, `iat`, `exp`, `jti`) via `NimbusJwtEncoder` (from 2.1.7's bean); `BCryptPasswordEncoder` wiring for hash/verify.
   Design: D3 (token strategy table).
 
-- [ ] **2.2.5** `POST /auth/login` (Clinic subdomain, public; body `{email, password}` only): resolve user by email, verify password, find `Membership` for the request's Clinic (resolved by 2.3.3's filter), issue tokens; 401 on bad credentials or no Membership in that Clinic; 404 on unresolvable subdomain (delegated to 2.3.3); apex-host login rejected/handled outside the per-Clinic contract.
+  **STATUS: DONE (#21). Nimbus, not JJWT. The decoder validates the issuer as well as the signature (#22).**
+
+- [x] **2.2.5** `POST /auth/login` (Clinic subdomain, public; body `{email, password}` only): resolve user by email, verify password, find `Membership` for the request's Clinic (resolved by 2.3.3's filter), issue tokens; 401 on bad credentials or no Membership in that Clinic; 404 on unresolvable subdomain (delegated to 2.3.3); apex-host login rejected/handled outside the per-Clinic contract.
   Spec: iam-auth/Login (all 5 scenarios). Design: D3 login sequence.
   **Hard cross-dependency:** requires 2.3.1–2.3.3 (`TenantContext` + `SubdomainTenantResolutionFilter`) to be functionally present for the Clinic-scoped lookup — flag at PR review if 2.3 slices lag behind.
 
-- [ ] **2.2.6** Refresh-token store + rotation + reuse detection (`refresh_token` hash, `rotated_from` lineage); `POST /auth/refresh` — 401 on expired/malformed/unknown token, entire-lineage revoke on reuse.
+  **STATUS: DONE (#21). Unknown email and wrong password are byte-identical, and the encoder runs on the no-such-user path so the two cost comparable time.**
+
+- [x] **2.2.6** Refresh-token store + rotation + reuse detection (`refresh_token` hash, `rotated_from` lineage); `POST /auth/refresh` — 401 on expired/malformed/unknown token, entire-lineage revoke on reuse.
   Spec: iam-auth/Token Refresh (both scenarios). Design: D3 refresh sequence.
 
-- [ ] **2.2.7** `POST /auth/logout` (bearer required): revoke presented refresh token (+ optional lineage); 204.
+  **STATUS: DONE (#24). Reuse revokes the whole lineage via one recursive query. `noRollbackFor` holds that write: the refusal throws, and `REQUIRES_NEW` deadlocks against the suite's one-connection pool.**
+
+- [x] **2.2.7** `POST /auth/logout` (bearer required): revoke presented refresh token (+ optional lineage); 204.
   Spec: iam-auth/Logout. Design: D3 logout sequence.
 
-- [ ] **2.2.8** Staff invitation: `POST /clinics/{id}/invitations` (bearer, ADMIN only — 403 for non-admin); `POST /invitations/{token}/accept` (public, invite token) creating/linking `User` + `Membership`.
+  **STATUS: DONE (#24).**
+
+- [x] **2.2.8** Staff invitation: `POST /clinics/{id}/invitations` (bearer, ADMIN only — 403 for non-admin); `POST /invitations/{token}/accept` (public, invite token) creating/linking `User` + `Membership`.
   Spec: iam-auth/Staff Invitation (both scenarios).
 
-- [ ] **2.2.9** `GET /me` protected probe endpoint; verify 401 without/with expired-invalid JWT and 200 with a valid token.
+  **STATUS: DONE (#25). Path is `/invitations`, not `/clinics/{id}/invitations` — the Clinic comes from the session, so no identifier is offered for a caller to substitute. Token stored as a hash (migration V5).**
+
+- [x] **2.2.9** `GET /me` protected probe endpoint; verify 401 without/with expired-invalid JWT and 200 with a valid token.
   Spec: iam-auth/Protected Endpoint Access Control (both scenarios).
 
-- [ ] **2.2.10** iam integration test suite (Testcontainers): full flow onboarding → login → refresh → logout → invitation-accept, plus every negative scenario in iam-auth spec.md (duplicate clinic, invalid payload, bad credentials, wrong-clinic login, unresolvable subdomain, apex-host login, expired/invalid refresh, reuse detection, non-admin invite).
+  **STATUS: DONE (#22). Reads the token, not the database: the claims are what the request is authorized against.**
+
+- [x] **2.2.10** iam integration test suite (Testcontainers): full flow onboarding → login → refresh → logout → invitation-accept, plus every negative scenario in iam-auth spec.md (duplicate clinic, invalid payload, bad credentials, wrong-clinic login, unresolvable subdomain, apex-host login, expired/invalid refresh, reuse detection, non-admin invite).
   Spec: iam-auth/spec.md — full coverage gate.
   **DoD:** all iam-auth scenarios green; this is the closing task for PKG-2.2.
 
@@ -131,21 +149,33 @@ Spec: `iam-auth/spec.md` (Clinic Onboarding, Login, Token Refresh, Logout, Staff
 
 Spec: `multi-tenancy/spec.md` (Clinic Attribution, Clinic-Scoped Query Filtering, Per-Request Clinic Context Activation, Cross-Clinic Isolation). Design: D2, D6 (contract already stubbed in 2.1.9), D1 (shared value objects).
 
-- [ ] **2.3.1** `TenantContext` in `shared.tenancy`: `ThreadLocal<UUID>` with `set`/`get`/`clear`.
+  **STATUS: DONE, distributed. Each ticket carries its own negative scenarios; #13 is the isolation evidence.**
+
+- [x] **2.3.1** `TenantContext` in `shared.tenancy`: `ThreadLocal<UUID>` with `set`/`get`/`clear`.
   Design: D2 components table.
 
-- [ ] **2.3.2** `ClinicTenantIdentifierResolver` implementing Hibernate `CurrentTenantIdentifierResolver<UUID>`, reading `TenantContext.get()`; confirm Spring Boot auto-wires it into the `SessionFactory`.
+  **STATUS: DONE (#10).**
+
+- [x] **2.3.2** `ClinicTenantIdentifierResolver` implementing Hibernate `CurrentTenantIdentifierResolver<UUID>`, reading `TenantContext.get()`; confirm Spring Boot auto-wires it into the `SessionFactory`.
   Design: D2.
 
-- [ ] **2.3.3** `SubdomainTenantResolutionFilter` (`OncePerRequestFilter`, early in the chain): parse Host header; classify apex/reserved labels (`app`, `www`, `api`, bare apex) vs a real Clinic slug; resolve `Clinic` by slug (global lookup) and `TenantContext.set(...)`; 404 on unknown non-reserved slug; skip `TenantContext` for apex/reserved hosts; dev override for `local`/`test` profiles only: `{slug}.localhost` base domain + `X-Tenant-Slug` header (never enabled in `prod`).
+  **STATUS: DONE (#10).**
+
+- [x] **2.3.3** `SubdomainTenantResolutionFilter` (`OncePerRequestFilter`, early in the chain): parse Host header; classify apex/reserved labels (`app`, `www`, `api`, bare apex) vs a real Clinic slug; resolve `Clinic` by slug (global lookup) and `TenantContext.set(...)`; 404 on unknown non-reserved slug; skip `TenantContext` for apex/reserved hosts; dev override for `local`/`test` profiles only: `{slug}.localhost` base domain + `X-Tenant-Slug` header (never enabled in `prod`).
   Spec: multi-tenancy/Per-Request Clinic Context Activation (subdomain scenario); iam-auth/Login (unresolvable-subdomain 404, apex-host scenarios). Design: D2 components table, D3 local/dev handling.
   **Blocks:** 2.2.5 (login needs the resolved Clinic).
 
-- [ ] **2.3.4** `TenantContextFilter` (after the JWT resource-server auth filter): read `clinic_id` from JWT claims (authoritative); assert it matches the subdomain-resolved Clinic from 2.3.3 (else 403); overwrite `TenantContext` with the JWT Clinic; `clear()` in `finally`.
+  **STATUS: DONE (#20). Named `SubdomainClinicResolutionFilter` — `CONTEXT.md` reserves "Clinic" over "Tenant". Override header is `X-Clinic-Slug`.**
+
+- [x] **2.3.4** `TenantContextFilter` (after the JWT resource-server auth filter): read `clinic_id` from JWT claims (authoritative); assert it matches the subdomain-resolved Clinic from 2.3.3 (else 403); overwrite `TenantContext` with the JWT Clinic; `clear()` in `finally`.
   Spec: multi-tenancy/Per-Request Clinic Context Activation (JWT scenario, mismatch scenario). Design: D2.
 
-- [ ] **2.3.5** Wire filter-chain order in `SecurityConfig` (2.1.7's skeleton): `SubdomainTenantResolutionFilter` → JWT resource-server auth → `TenantContextFilter`.
+  **STATUS: DONE (#22), as `AuthenticatedClinicFilter`. Restores the subdomain Clinic on the way out, so an apex request cannot leak one to the next request on the thread.**
+
+- [x] **2.3.5** Wire filter-chain order in `SecurityConfig` (2.1.7's skeleton): `SubdomainTenantResolutionFilter` → JWT resource-server auth → `TenantContextFilter`.
   Design: D2 chain-ordering note.
+
+  **STATUS: DONE (#22). `anyRequest().permitAll()` is gone; only onboarding, login, invitation acceptance and the docs are public.**
 
 - [ ] **2.3.6** Shared value objects in `shared.domain`: `Money`, typed identifiers (e.g. `ClinicId`/`UserId` wrappers), `PageResponse<T>` pagination envelope.
   Design: D1 package map. Proposal: PKG-2.3 scope.
@@ -157,7 +187,7 @@ Spec: `multi-tenancy/spec.md` (Clinic Attribution, Clinic-Scoped Query Filtering
   The planned repository-only test was replaced by the native `DataSource` RLS suite delivered in issues #8 and #10. A repository test cannot prove the database layer: it would stay green under Hibernate `@TenantId` even if every PostgreSQL policy were removed. The replacement uses the restricted application role, native SQL, catalog enumeration, transaction-local Clinic publication, and forced pool reuse. Repository/HTTP coverage remains in 2.3.9 for request and ORM behavior.
   Spec: multi-tenancy/Independent Database Enforcement, Cross-Clinic Isolation, Clinic-Scoped Query Filtering. Design: "Mandatory isolation tests" section.
 
-- [ ] **2.3.9** Clinic-context filter integration tests: JWT-vs-subdomain match activates the Clinic; mismatch → 403 with no Clinic activated; public request activates the Clinic from subdomain alone.
+- [x] **2.3.9** Clinic-context filter integration tests: JWT-vs-subdomain match activates the Clinic; mismatch → 403 with no Clinic activated; public request activates the Clinic from subdomain alone.
   Spec: multi-tenancy/Per-Request Clinic Context Activation (all 3 scenarios).
 
 ---
@@ -199,6 +229,8 @@ PR-0 (git gate)
 ---
 
 ## Design cross-cutting checklist (traceability — mirrors design.md)
+
+  **STATUS: DONE (#22, #13).**
 
 - [x] `ApiApplication` moved to `com.zendent`; tests repackaged. → 2.1.2
 - [x] `ModularityTests` runs `verify()` + writes PlantUML docs. → 2.1.5
