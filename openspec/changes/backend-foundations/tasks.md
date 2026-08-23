@@ -16,9 +16,11 @@ Phase 2 backend foundation: platform bootstrap, `iam` auth, `shared` + Clinic is
 
 ## Task 0 — Prerequisite gate (blocks the first backend commit)
 
-- [ ] **0.1** Resolve monorepo git reconciliation: decide **absorb** (frontend history flattened) vs **subtree/submodule** (history preserved) for merging `webapp-zendent/` into a root-level monorepo. **Back up `webapp-zendent/.git` before executing any history-flattening absorb.** No backend commit (PR-1 or later) may land until this gate is closed.
+- [x] **0.1** Resolve monorepo git reconciliation: decide **absorb** (frontend history flattened) vs **subtree/submodule** (history preserved) for merging `webapp-zendent/` into a root-level monorepo. **Back up `webapp-zendent/.git` before executing any history-flattening absorb.** No backend commit (PR-1 or later) may land until this gate is closed.
   - Not designed here (per design.md, this is out-of-band). This task is a go/no-go gate, not a code task.
   - **Blocks:** all of 2.1, 2.2, 2.3.
+  **STATUS: CERRADA — el gate era teórico.** El frontend nunca tuvo repositorio propio: se construyó dentro de este repo desde el commit inicial `763a732`, así que no había historia que preservar, ni `.git` que respaldar, ni disyuntiva real entre absorber y subtree. Registrado en ADR 0016. La condición «ningún commit de backend puede aterrizar antes» quedó superada por los hechos hace tiempo, y sin consecuencias porque no había nada que perder.
+
 
 ---
 
@@ -239,19 +241,19 @@ PR-0 (git gate)
 - [x] `ApiApplication` moved to `com.zendent`; tests repackaged. → 2.1.2
 - [x] `ModularityTests` runs `verify()` + writes PlantUML docs. → 2.1.5
 - [x] `shared` marked OPEN; `iam` closed with named-interface surface. → 2.1.3, 2.1.4
-- [ ] `@TenantId` on `Membership.clinicId`; `ClinicTenantIdentifierResolver` wired into the `SessionFactory`. → 2.2.1, 2.3.2
-- [ ] `SubdomainTenantResolutionFilter` (early) resolves the Clinic from Host; apex/reserved labels skipped; unknown slug → 404. → 2.3.3
-- [ ] `TenantContextFilter` (after JWT auth) applies the authoritative JWT Clinic and asserts subdomain == JWT `clinic_id` (mismatch → 403). → 2.3.4
-- [ ] `local`/`test` dev override: `{slug}.localhost` + `X-Tenant-Slug` header (never enabled in `prod`). → 2.3.3
-- [ ] Wildcard-subdomain CORS noted as a config item. → 2.3.7
+- [x] `@TenantId` on `Membership.clinicId` — and on `RefreshToken` and `StaffInvitation` too; `ClinicTenantIdentifierResolver` wired into the `SessionFactory`. → 2.2.1, 2.3.2
+- [x] Resolves the Clinic from Host; apex/reserved labels skipped; unknown slug → 404. → 2.3.3 — shipped as `SubdomainClinicResolutionFilter`: `CONTEXT.md` reserves "Clinic" over "Tenant".
+- [x] After JWT auth, applies the authoritative JWT Clinic and asserts subdomain == JWT `clinic_id` (mismatch → 403). → 2.3.4 — shipped as `AuthenticatedClinicFilter`, same naming reason.
+- [x] `local`/`test` dev override: `{slug}.localhost` + a header, never enabled in `prod`. → 2.3.3 — the header is `X-Clinic-Slug`, not `X-Tenant-Slug`.
+- [x] Wildcard-subdomain CORS. → 2.3.7 — built, not merely noted: origin *patterns* with credentials, per profile.
 - [x] Native RLS Clinic-isolation gate green; repository-only plan replaced because it cannot prove database enforcement. → 2.3.8 replacement (#8, #10)
-- [ ] `spring-boot-starter-oauth2-resource-server` added; HS256 encoder/decoder from one secret. → 2.1.7
-- [ ] `refresh_token` store with rotation + reuse detection; logout revokes. → 2.2.6, 2.2.7
+- [x] `spring-boot-starter-oauth2-resource-server` added; HS256 encoder/decoder from one secret. → 2.1.7 — the decoder also validates the issuer (#22).
+- [x] `refresh_token` store with rotation + reuse detection; logout revokes. → 2.2.6, 2.2.7 — reuse revokes the whole lineage, and only the hash is stored.
 - [x] `V1__init.sql` baseline (extensions + iam + refresh + invitation + Modulith `event_publication`). → 2.1.8
 - [x] MapStruct added (or hand-written fallback if JDK 25 processor fails). → 2.1.1, 2.2.2 — verdict: adopted, works on JDK 25.
 - [x] `ClinicCreatedEvent` in `shared.events`; outbox schema in Flyway, auto-init disabled. → 2.1.9
-- [ ] `ProblemDetail` advice + Security entry-point/denied handlers. → 2.1.10
-- [ ] Monorepo git reconciliation resolved BEFORE first commit. → 0.1
+- [x] `ProblemDetail` advice + Security entry-point/denied handlers. → 2.1.10
+- [x] Monorepo git reconciliation. → 0.1 — moot: the frontend never had a repository of its own (ADR 0016).
 
 ## Next step
 
