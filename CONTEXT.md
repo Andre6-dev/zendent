@@ -17,13 +17,16 @@ consultorio de un solo odontólogo también es una Clinic.
 _Avoid_: Tenant, Organization, Practice, Consultorio
 
 **Membership**:
-La pertenencia de un usuario a una Clinic con un rol determinado. Un mismo
-usuario puede tener Membership en varias Clinics.
+La pertenencia de un usuario a una Clinic con un rol determinado: es lo que le
+da acceso al sistema. Un mismo usuario puede tener Membership en varias Clinics.
+Todo Dentist y todo Staff de una Clinic tiene una. Se revoca, nunca se borra: el
+rastro de quién tuvo acceso a la Clinic y hasta cuándo se conserva.
 _Avoid_: UserRole, Employee, Account
 
 **Dentist**:
 El miembro de una Clinic que ejerce clínicamente: atiende Appointments, ejecuta
-Procedures y escribe en el Odontogram.
+Procedures y escribe en el Odontogram. Siempre tiene Membership — en Zendenta no
+se ejerce sin cuenta.
 _Avoid_: Doctor, Practitioner, Odontólogo, Provider
 
 **Staff**:

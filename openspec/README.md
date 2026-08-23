@@ -29,6 +29,9 @@ openspec/
   Maven and package `com.zendent.api` (groupId `com.zendent`).
 - Roadmap intent (see `webapp-zendent/docs/plan/phase-*.md`): change 1 was
   `frontend-layout-reservations` (Fase 1) and change 2 was `backend-foundations`
-  (Fase 2). Both are archived; their specs are merged into `specs/`. The next
-  changes are the business modules the Fase 2 proposal put out of scope —
-  `patients`, `treatments`, `reservations` against the real API.
+  (Fase 2). Both are archived; their specs are merged into `specs/`. Phase 3 was
+  then re-planned (see `webapp-zendent/docs/plan/phase-3-core-modules.md`): two
+  prerequisites come before the business modules, because the frontend has no
+  integration with the Fase 2 auth surface at all. The order is
+  `iam-password-recovery` → `frontend-auth-shell` → the Staff List, then
+  `patients`, `treatments` and `reservations` against the real API.

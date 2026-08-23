@@ -195,14 +195,21 @@ Sin backend. Todo con datos mock (`@faker-js/faker`). Objetivo visual: replicar 
 - **PKG-2.2** — Módulo `iam`: `Clinic` (tenant), `User`, `Role`, login JWT (Spring Security), onboarding de clínica, filtro de tenancy (`clinic_id`).
 - **PKG-2.3** — `shared`: `Money`, tipos comunes, infraestructura de eventos (Modulith), MapStruct base, manejo de errores (RFC 7807).
 
-### FASE 3 — Módulos núcleo (paralelizables tras Fase 2)
+### FASE 3 — Módulos núcleo (paralelizables tras los prerrequisitos)
 
-Cada módulo = 1 paquete backend + 1 paquete frontend (rutas/feature) que lo consume. Sugerido un agente por módulo:
+> Reescrita. El detalle vive en [`plan/phase-3-core-modules.md`](./plan/phase-3-core-modules.md); esto es solo el resumen.
 
-- **PKG-3.1 Staff** (`staff`) + UI Staff List.
+Dos prerrequisitos bloquean la fase entera, porque el frontend no tiene integrado nada de la Fase 2:
+
+- **PRE-A `iam-password-recovery`** — forgot/reset por correo (Mailpit en local), rate limit, revocación de sesiones.
+- **PRE-B `frontend-auth-shell`** — BFF con cookies `httpOnly`, `/login`, guard, refresh, `401 → /login`.
+
+Después, paralelizables:
+
+- **PKG-3.1 Staff List** — **sin módulo backend nuevo**: un Dentist es un `Membership` con rol `DENTIST`, así que es filtro por rol + baja de miembro en `iam`, más la pantalla.
 - **PKG-3.2 Patients** (`patients`, incluye odontograma y medical record) + UI Patients (lista/detalle/odontograma).
-- **PKG-3.3 Treatments** (`treatments`, visitas + componentes) + UI flujo "Add a treatment" (wizard).
-- **PKG-3.4 Reservations** (`reservations`, citas + waitlist) + reemplazar mock de Fase 1 por API real; modal nueva cita; waitlist wizard.
+- **PKG-3.3 Treatments** (`treatments`, visitas + componentes) + UI flujo "Add a treatment" (wizard). Hereda las **especialidades**.
+- **PKG-3.4 Reservations** (`reservations`, citas + waitlist) + reemplazar mock de Fase 1 por API real; modal nueva cita; waitlist wizard. Hereda las **Working Hours**.
 
 ### FASE 4 — Finanzas & Activos
 

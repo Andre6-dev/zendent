@@ -17,7 +17,7 @@ Este directorio (`docs/plan/`) es la fuente de verdad del plan. **No se escribe 
 | [screens.md](./screens.md)                                                           | Inventario completo de pantallas (mejorado y completado).                                        |
 | [phase-1-frontend-layout-reservations.md](./phase-1-frontend-layout-reservations.md) | **Primer entregable de código** (detallado): layout + calendario de Reservaciones con mock data. |
 | [phase-2-backend-foundations.md](./phase-2-backend-foundations.md)                   | Bootstrap Spring Boot 4, Modulith, tenancy, IAM.                                                 |
-| [phase-3-core-modules.md](./phase-3-core-modules.md)                                 | Módulos núcleo: staff, patients, treatments, reservations.                                       |
+| [phase-3-core-modules.md](./phase-3-core-modules.md)                                 | Prerrequisitos de auth + módulos núcleo: patients, treatments, reservations.                                       |
 | [phase-4-finance-assets.md](./phase-4-finance-assets.md)                             | Billing, inventory, purchases, accounts.                                                         |
 | [phase-5-cross-cutting.md](./phase-5-cross-cutting.md)                               | Dashboard, reporting, support, settings.                                                         |
 | [multiagent-workflow.md](./multiagent-workflow.md)                                   | Contrato entre agentes y asignación de paquetes (PKG).                                           |
@@ -71,7 +71,7 @@ El dominio tiene _bounded contexts_ nítidos (pacientes, tratamientos, reservaci
 | ---------- | ------------------------------------------------------------------------------------------------------- | --------- |
 | **Fase 1** | Frontend: layout (sidebar + navbar) + calendario de Reservaciones con mock data. **Primer entregable.** | Pendiente |
 | **Fase 2** | Backend: bootstrap Spring Boot 4 + Modulith + tenancy + IAM.                                            | Pendiente |
-| **Fase 3** | Módulos núcleo: staff, patients (odontograma), treatments, reservations (API real).                     | Pendiente |
+| **Fase 3** | Auth en el frontend (prerrequisito) + módulos núcleo: staff list, patients (odontograma), treatments, reservations (API real).                     | Pendiente |
 | **Fase 4** | Finanzas y activos: billing (Pay Bill), inventory, purchases, accounts.                                 | Pendiente |
 | **Fase 5** | Transversales: dashboard, reporting, support, settings/perfil, búsqueda y notificaciones.               | Pendiente |
 
