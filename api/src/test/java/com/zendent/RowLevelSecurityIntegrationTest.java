@@ -86,7 +86,7 @@ class RowLevelSecurityIntegrationTest {
 				fixture.rows().refreshTokenB(), userB, clinicB, "hash-" + fixture.rows().refreshTokenB(), "jti-b");
 		ownerJdbcTemplate.update("""
 				INSERT INTO staff_invitation
-				    (id, clinic_id, email, role_id, token, status, invited_by, expires_at)
+				    (id, clinic_id, email, role_id, token_hash, status, invited_by, expires_at)
 				VALUES (?, ?, ?, ?, ?, 'PENDING', ?, now() + interval '1 day'),
 				       (?, ?, ?, ?, ?, 'PENDING', ?, now() + interval '1 day')
 				""",
@@ -158,7 +158,7 @@ class RowLevelSecurityIntegrationTest {
 				""", UUID.randomUUID(), fixture.spareUser(), fixture.clinicA(), "missing-" + UUID.randomUUID());
 		assertInsertRejected(null, """
 				INSERT INTO staff_invitation
-				    (id, clinic_id, email, role_id, token, status, invited_by, expires_at)
+				    (id, clinic_id, email, role_id, token_hash, status, invited_by, expires_at)
 				VALUES (?, ?, 'missing@example.com', ?, ?, 'PENDING', ?, now() + interval '1 day')
 				""", UUID.randomUUID(), fixture.clinicA(), fixture.roleId(),
 				"missing-" + UUID.randomUUID(), fixture.spareUser());
@@ -176,7 +176,7 @@ class RowLevelSecurityIntegrationTest {
 				""", UUID.randomUUID(), fixture.spareUser(), fixture.clinicB(), "wrong-" + UUID.randomUUID());
 		assertInsertRejected(fixture.clinicA(), """
 				INSERT INTO staff_invitation
-				    (id, clinic_id, email, role_id, token, status, invited_by, expires_at)
+				    (id, clinic_id, email, role_id, token_hash, status, invited_by, expires_at)
 				VALUES (?, ?, 'wrong@example.com', ?, ?, 'PENDING', ?, now() + interval '1 day')
 				""", UUID.randomUUID(), fixture.clinicB(), fixture.roleId(),
 				"wrong-" + UUID.randomUUID(), fixture.spareUser());
