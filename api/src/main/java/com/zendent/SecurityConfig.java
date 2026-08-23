@@ -12,7 +12,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -49,6 +52,7 @@ import com.zendent.shared.web.ProblemDetailWriter;
  */
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
 
 	private static final String[] PUBLIC_ENDPOINTS = {
@@ -57,6 +61,8 @@ public class SecurityConfig {
 			// The access token it replaces may already have expired, so this
 			// cannot require one.
 			"/auth/refresh",
+			// The invited person has no session yet; the token is the boundary.
+			"/invitations/*/accept",
 	};
 
 	private static final String[] DOC_ENDPOINTS = {
@@ -85,11 +91,27 @@ public class SecurityConfig {
 				// and login is how a session is obtained in the first place.
 				.requestMatchers(PUBLIC_ENDPOINTS).permitAll()
 				.anyRequest().authenticated())
-			.oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)))
+			.oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt
+				.decoder(jwtDecoder)
+				.jwtAuthenticationConverter(clinicRoleConverter())))
 			.exceptionHandling(exceptions -> exceptions
 				.authenticationEntryPoint(authenticationEntryPoint)
 				.accessDeniedHandler(accessDeniedHandler));
 		return http.build();
+	}
+
+	/**
+	 * Turns the {@code roles} claim login writes into Spring Security role
+	 * authorities, so {@code hasRole('ADMIN')} reads the Membership's role
+	 * rather than an OAuth2 scope this application never issues.
+	 */
+	private static JwtAuthenticationConverter clinicRoleConverter() {
+		JwtGrantedAuthoritiesConverter authorities = new JwtGrantedAuthoritiesConverter();
+		authorities.setAuthoritiesClaimName("roles");
+		authorities.setAuthorityPrefix("ROLE_");
+		JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+		converter.setJwtGrantedAuthoritiesConverter(authorities);
+		return converter;
 	}
 
 	@Bean

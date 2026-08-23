@@ -28,6 +28,10 @@ public final class ErrorMessages {
 	public static final String REGISTRATION_REQUIRES_ONBOARDING_HOST =
 			"Clinic registration is only available on the onboarding host";
 
+	public static final String ALREADY_A_MEMBER = "That person already holds a Membership in this Clinic";
+
+	public static final String INVITATION_NOT_REDEEMABLE = "No redeemable invitation for that token";
+
 	public static final String INVALID_REFRESH_TOKEN = "Invalid refresh token";
 
 	public static final String MEMBER_NOT_FOUND = "No such member in this Clinic";

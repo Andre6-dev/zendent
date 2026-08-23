@@ -7,6 +7,10 @@ zendent:
     # Long enough that a person is not asked for a password daily, short enough
     # that an abandoned session eventually dies on its own.
     refresh-token-ttl: P30D
+  invitation:
+    # An invitation that stays redeemable forever is a permanent key to a Clinic
+    # sitting in someone's inbox.
+    ttl: P7D
 
 spring:
   application:
