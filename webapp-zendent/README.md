@@ -1,4 +1,4 @@
-Welcome to your new TanStack Start app! 
+Welcome to your new TanStack Start app!
 
 # Getting Started
 
@@ -6,8 +6,20 @@ To run this application:
 
 ```bash
 bun install
-bun --bun run dev
+ZENDENT_API_PORT=8080 bun --bun run dev
 ```
+
+Then open **`http://avicena.localhost:3000`** — a clinic subdomain, not plain
+`localhost`. The clinic a request belongs to is decided by the host it arrives
+on and by nothing else, so plain `localhost` names no clinic and the API
+answers 404. Chrome and Firefox resolve `*.localhost` with no change to
+`/etc/hosts`.
+
+`ZENDENT_API_PORT` is development-only. It exists because the backend listens
+on its own port locally, while in production the API is served under the same
+host as the app, under `/api` (see `docs/adr/0017-*`). Only the port is
+overridden — the clinic label in the hostname is carried through untouched.
+Start the backend first: `cd ../api && ./mvnw spring-boot:run`.
 
 # Building For Production
 
@@ -40,7 +52,6 @@ If you prefer not to use Tailwind CSS:
 
 ## Linting & Formatting
 
-
 This project uses [eslint](https://eslint.org/) and [prettier](https://prettier.io/) for linting and formatting. Eslint is configured using [tanstack/eslint-config](https://tanstack.com/config/latest/docs/eslint). The following scripts are available:
 
 ```bash
@@ -48,7 +59,6 @@ bun --bun run lint
 bun --bun run format
 bun --bun run check
 ```
-
 
 ## Deploy with Nitro
 
@@ -62,8 +72,6 @@ node dist/server/index.mjs
 The build output is a self-contained Node server. To deploy, push the `dist/` directory to your host (Render, Fly.io, your own VPS, etc.) and run the server command above.
 
 For host-specific presets (Vercel, Netlify, Cloudflare, AWS Lambda, etc.) and tuning, see https://v3.nitro.build/deploy.
-
-
 
 ## Routing
 
@@ -82,7 +90,7 @@ Now that you have two routes you can use a `Link` component to navigate between 
 To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
 
 ```tsx
-import { Link } from "@tanstack/react-router";
+import { Link } from '@tanstack/react-router'
 ```
 
 Then anywhere in your JSX you can use it like so:
@@ -150,11 +158,11 @@ const getServerTime = createServerFn({
 // Use in a component
 function MyComponent() {
   const [time, setTime] = useState('')
-  
+
   useEffect(() => {
     getServerTime().then(setTime)
   }, [])
-  
+
   return <div>Server time: {time}</div>
 }
 ```
