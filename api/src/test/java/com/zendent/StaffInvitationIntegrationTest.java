@@ -89,7 +89,7 @@ class StaffInvitationIntegrationTest {
 
 		mockMvc.perform(get("/members").with(serverName(admin.host())).header("Authorization", admin.bearer()))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.length()").value(2));
+			.andExpect(jsonPath("$.content.length()").value(2));
 
 		// The invited person can now sign in and is a Dentist, not an administrator.
 		String bearer = "Bearer " + JsonPath.<String>read(login(admin.slug(), email), "$.accessToken");

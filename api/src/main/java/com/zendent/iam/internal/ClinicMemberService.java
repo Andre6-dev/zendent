@@ -1,14 +1,15 @@
 package com.zendent.iam.internal;
 
-import java.util.List;
 import java.util.UUID;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.zendent.iam.mapper.MemberMapper;
 import com.zendent.iam.web.MemberResponse;
 import com.zendent.shared.domain.ErrorMessages;
+import com.zendent.shared.domain.PageResponse;
 import com.zendent.shared.domain.NotFoundException;
 
 /**
@@ -32,8 +33,8 @@ public class ClinicMemberService {
 	}
 
 	@Transactional(readOnly = true)
-	public List<MemberResponse> listMembers() {
-		return membershipRepository.findAll().stream().map(mapper::toResponse).toList();
+	public PageResponse<MemberResponse> listMembers(Pageable pageable) {
+		return PageResponse.from(membershipRepository.findAll(pageable)).map(mapper::toResponse);
 	}
 
 	@Transactional(readOnly = true)
