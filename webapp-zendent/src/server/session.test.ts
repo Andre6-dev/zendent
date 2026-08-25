@@ -2,6 +2,7 @@ import { expect, test } from 'vitest'
 import {
   ACCESS_COOKIE,
   REFRESH_COOKIE,
+  clearedSessionCookies,
   hasSession,
   isSecureRequest,
   readCookie,
@@ -121,4 +122,28 @@ test('an access cookie emptied by a sign-out is not a session', () => {
   })
 
   expect(hasSession(request)).toBe(false)
+})
+
+test('the cleared cookies mirror how the session was set', () => {
+  const [access, refresh] = clearedSessionCookies(true)
+
+  // A cookie is only replaced by one matching how it was set, so these have to
+  // carry the same name, path and attributes — not merely the same two names.
+  expect(access).toContain(`${ACCESS_COOKIE}=;`)
+  expect(refresh).toContain(`${REFRESH_COOKIE}=;`)
+  for (const cookie of [access, refresh]) {
+    expect(cookie).toContain('Max-Age=0')
+    expect(cookie).toContain('Path=/')
+    expect(cookie).toContain('HttpOnly')
+    expect(cookie).toContain('SameSite=Lax')
+    expect(cookie).toContain('Secure')
+  }
+})
+
+test('clearing over plain http is not marked secure', () => {
+  // Same reason setting them is not: the browser would refuse to store the
+  // replacement, and the live cookie would survive the sign-out.
+  for (const cookie of clearedSessionCookies(false)) {
+    expect(cookie).not.toContain('Secure')
+  }
 })

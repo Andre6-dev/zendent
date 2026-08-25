@@ -1,27 +1,39 @@
-import { Outlet, createFileRoute, redirect } from '@tanstack/react-router'
+import { Outlet, createFileRoute } from '@tanstack/react-router'
 import { createIsomorphicFn } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
 import { AppLayout } from '#/components/layout/AppLayout'
+import { renewOnce } from '#/server/session-calls'
 import { hasSession } from '#/server/session'
 
 /**
- * Whether the request resolving this route carries a session.
+ * Lets the request resolving this route through, or turns it away.
  *
- * On the server that is read off the incoming request. On the client the answer
- * is `true` — not because the browser knows, but because it cannot: the session
+ * On the server the incoming request decides. On the client nothing is checked
+ * — not because the browser is trusted, but because it cannot see: the session
  * cookie is HTTP-only by design (ADR 0017), so anything computed there would be
  * a guess. `createIsomorphicFn` keeps the two apart, and the server half — with
  * `getRequest` and everything it reaches — is compiled out of the browser
  * bundle rather than merely unused in it.
  *
- * The document that puts the application on screen is served only after the
- * server has said yes, and every navigation afterwards happens inside a shell
- * that already passed. A session lapsing mid-use is renewal's problem, not the
- * door's.
+ * The access cookie expires with the token it carries, so a person coming back
+ * from lunch arrives without one and with a refresh cookie that is good for a
+ * month. Turning them away there would be the session quietly expiring under
+ * someone who did nothing wrong. So the door renews rather than evicts: one
+ * exchange, and only for a request that arrives without an access token — never
+ * a round trip in front of a document that already carries one.
+ *
+ * Renewal either succeeds, and the person notices nothing, or it sends them to
+ * sign-in with the session emptied.
  */
-const requestHasSession = createIsomorphicFn()
-  .server(() => hasSession(getRequest()))
-  .client(() => true)
+const admit = createIsomorphicFn()
+  .server(async () => {
+    const request = getRequest()
+    if (hasSession(request)) {
+      return
+    }
+    await renewOnce(request)
+  })
+  .client(() => {})
 
 export const Route = createFileRoute('/_app')({
   /**
@@ -32,10 +44,8 @@ export const Route = createFileRoute('/_app')({
    * whatever the screens put in it to someone with no session, then redirect
    * them once it had already arrived.
    */
-  beforeLoad: () => {
-    if (!requestHasSession()) {
-      throw redirect({ to: '/login' })
-    }
+  beforeLoad: async () => {
+    await admit()
   },
   component: AppLayoutRoute,
 })

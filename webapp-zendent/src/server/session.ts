@@ -1,3 +1,5 @@
+import { z } from 'zod'
+
 /**
  * The session lives here and nowhere else. Both tokens stay on the server side
  * of the application, carried between it and the browser as cookies the
@@ -15,6 +17,26 @@ export const REFRESH_COOKIE = 'zendent_refresh'
  */
 const REFRESH_MAX_AGE_SECONDS = 30 * 24 * 60 * 60
 
+/**
+ * What the API answers with when it issues a session — on sign-in and on
+ * renewal alike, which is why the shape is described here rather than beside
+ * either one of them. Parsed rather than trusted: a session is the one thing
+ * worth refusing to build out of a body we did not recognise.
+ */
+export const apiSessionSchema = z.object({
+  accessToken: z.string().min(1),
+  tokenType: z.string(),
+  expiresIn: z.number().int().positive(),
+  refreshToken: z.string().min(1),
+})
+
+/**
+ * The part of that answer the cookies are built from.
+ *
+ * Narrower than the schema on purpose: `tokenType` is the API telling us how to
+ * present the token, not part of the session itself, and asking for it here
+ * would make every caller carry a field this file never reads.
+ */
 export interface ApiSession {
   accessToken: string
   refreshToken: string
@@ -81,6 +103,20 @@ export function sessionCookies(
   ]
 }
 
+/**
+ * The `Set-Cookie` values that take the session back out of the browser.
+ *
+ * Same name, same path, same attributes — a cookie is only replaced by one that
+ * matches how it was set, so these have to mirror `sessionCookies` rather than
+ * merely mention the same two names.
+ */
+export function clearedSessionCookies(secure: boolean): Array<string> {
+  return [
+    cookie(ACCESS_COOKIE, '', 0, secure),
+    cookie(REFRESH_COOKIE, '', 0, secure),
+  ]
+}
+
 export function readCookie(request: Request, name: string): string | undefined {
   const header = request.headers.get('cookie')
   if (header === null) {
@@ -101,14 +137,20 @@ export function readCookie(request: Request, name: string): string | undefined {
  *
  * The access cookie is what decides it. The refresh cookie outlives it and is
  * deliberately not consulted here: a request holding only that one has no
- * usable credential yet, and turning it into one is renewal's job, which does
- * not exist yet. Until it does, such a request is treated as signed out.
+ * usable credential yet, and turning it into one is renewal's job — see
+ * `renewOnce` in `session-calls.ts`, which is what such a request goes to.
  *
  * What this answers is presence, not validity. Whether the token is still good
  * is the API's to say, and it says so on every call the screens make; asking it
  * here would put a network round trip in front of every document. So an expired
- * or forged cookie gets through this door and is refused at the next one — the
- * assumption renewal (#48) and sign-out (#49) inherit.
+ * or forged cookie gets through this door and is refused at the next one, where
+ * renewal takes over.
+ *
+ * A `false` here does not mean signed out. The access cookie expires with the
+ * token it carries, so it is gone from a browser that still holds a refresh
+ * cookie good for a month — which is a session to be renewed, not a person to
+ * turn away. Callers ask this to find out whether a request can be made as it
+ * stands, never to decide whether someone may stay.
  */
 export function hasSession(request: Request): boolean {
   const token = readCookie(request, ACCESS_COOKIE)
