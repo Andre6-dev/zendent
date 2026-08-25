@@ -4,6 +4,9 @@
 # --- Env / secrets ---
 .env
 .env.*
+# The template is documentation, not a secret: without this negation the two
+# lines above would hide the one file a fresh clone needs.
+!.env.example
 *.local
 
 # --- Frontend build output (webapp-zendent/.gitignore also applies) ---
