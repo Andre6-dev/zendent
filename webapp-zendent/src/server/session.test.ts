@@ -2,6 +2,7 @@ import { expect, test } from 'vitest'
 import {
   ACCESS_COOKIE,
   REFRESH_COOKIE,
+  hasSession,
   isSecureRequest,
   readCookie,
   sessionCookies,
@@ -95,4 +96,29 @@ test('the scheme decides whether a request counts as secure', () => {
   expect(
     isSecureRequest(new Request('http://avicena.localhost:3000/login')),
   ).toBe(false)
+})
+
+test('the access cookie is what makes a request a session', () => {
+  const request = new Request('http://avicena.localhost:3000/reservations', {
+    headers: { cookie: `${ACCESS_COOKIE}=access-token-value` },
+  })
+
+  expect(hasSession(request)).toBe(true)
+})
+
+test('a request holding only the refresh cookie is not a session', () => {
+  // It cannot be used as a credential until renewal exists to trade it in.
+  const request = new Request('http://avicena.localhost:3000/reservations', {
+    headers: { cookie: `${REFRESH_COOKIE}=refresh-token-value` },
+  })
+
+  expect(hasSession(request)).toBe(false)
+})
+
+test('an access cookie emptied by a sign-out is not a session', () => {
+  const request = new Request('http://avicena.localhost:3000/reservations', {
+    headers: { cookie: `${ACCESS_COOKIE}=` },
+  })
+
+  expect(hasSession(request)).toBe(false)
 })
