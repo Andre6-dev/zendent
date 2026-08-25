@@ -95,3 +95,22 @@ export function readCookie(request: Request, name: string): string | undefined {
   }
   return undefined
 }
+
+/**
+ * Whether a request arrives with a session.
+ *
+ * The access cookie is what decides it. The refresh cookie outlives it and is
+ * deliberately not consulted here: a request holding only that one has no
+ * usable credential yet, and turning it into one is renewal's job, which does
+ * not exist yet. Until it does, such a request is treated as signed out.
+ *
+ * What this answers is presence, not validity. Whether the token is still good
+ * is the API's to say, and it says so on every call the screens make; asking it
+ * here would put a network round trip in front of every document. So an expired
+ * or forged cookie gets through this door and is refused at the next one — the
+ * assumption renewal (#48) and sign-out (#49) inherit.
+ */
+export function hasSession(request: Request): boolean {
+  const token = readCookie(request, ACCESS_COOKIE)
+  return token !== undefined && token.length > 0
+}
