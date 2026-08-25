@@ -4,8 +4,11 @@ import { Logo } from './Logo'
 import { ClinicSwitcher } from './ClinicSwitcher'
 import { navFooterItems, navGroups } from './nav-items'
 import type { NavItem } from './nav-items'
+import type { SignedInMember } from '#/features/auth/session'
 
 interface SidebarProps {
+  /** Who is signed in, and the Clinic they are signed in to. */
+  member: SignedInMember
   /** Called after a nav link is activated (used to close the mobile drawer). */
   onNavigate?: () => void
 }
@@ -30,7 +33,7 @@ function SidebarLink({
   )
 }
 
-export function Sidebar({ onNavigate }: SidebarProps) {
+export function Sidebar({ member, onNavigate }: SidebarProps) {
   return (
     <aside className="flex h-full w-64 flex-col border-r border-separator bg-background">
       <div className="flex h-16 items-center px-5">
@@ -38,7 +41,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       </div>
 
       <div className="px-3 pb-2">
-        <ClinicSwitcher />
+        <ClinicSwitcher clinicName={member.clinicName} />
       </div>
 
       <ScrollShadow className="flex-1 overflow-y-auto px-3 py-2">

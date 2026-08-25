@@ -1,8 +1,9 @@
 import { Outlet, createFileRoute } from '@tanstack/react-router'
-import { createIsomorphicFn } from '@tanstack/react-start'
-import { getRequest } from '@tanstack/react-start/server'
+import { createIsomorphicFn, createServerFn } from '@tanstack/react-start'
+import { getRequest, setResponseHeader } from '@tanstack/react-start/server'
 import { AppLayout } from '#/components/layout/AppLayout'
 import { renewOnce } from '#/server/session-calls'
+import { readSignedInMember } from '#/server/session-handlers'
 import { hasSession } from '#/server/session'
 
 /**
@@ -28,12 +29,28 @@ import { hasSession } from '#/server/session'
 const admit = createIsomorphicFn()
   .server(async () => {
     const request = getRequest()
+
+    // Never stored, so the back button after a sign-out has to ask the server
+    // again — and is turned away — rather than being handed the shell out of
+    // the browser's own history. It is also what keeps a Clinic's screens off
+    // the disk of a shared machine.
+    setResponseHeader('cache-control', 'no-store, must-revalidate')
+
     if (hasSession(request)) {
       return
     }
     await renewOnce(request)
   })
   .client(() => {})
+
+/**
+ * Who is signed in. Read on the server, where the session is, and handed to the
+ * shell as plain names — the browser is told what to put on screen and nothing
+ * about the session that produced it.
+ */
+const signedInMember = createServerFn({ method: 'GET' }).handler(() =>
+  readSignedInMember(getRequest()),
+)
 
 export const Route = createFileRoute('/_app')({
   /**
@@ -47,12 +64,15 @@ export const Route = createFileRoute('/_app')({
   beforeLoad: async () => {
     await admit()
   },
+  loader: () => signedInMember(),
   component: AppLayoutRoute,
 })
 
 function AppLayoutRoute() {
+  const member = Route.useLoaderData()
+
   return (
-    <AppLayout>
+    <AppLayout member={member}>
       <Outlet />
     </AppLayout>
   )

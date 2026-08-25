@@ -133,12 +133,16 @@ async function renewSession(from: Request): Promise<ApiSession> {
 /**
  * Ends the session: empties the cookies and sends the person to sign-in.
  *
+ * Exported because renewal is not the only thing that can find a session
+ * unusable — a call the API answers about a session it does not recognise
+ * lands in the same place.
+ *
  * Both halves matter. Clearing without redirecting leaves someone inside a
  * shell that can no longer answer them; redirecting without clearing sends
  * them to a sign-in screen while the browser still holds a dead session that
  * the next request would present all over again.
  */
-function endSession(from: Request, why: string): never {
+export function endSession(from: Request, why: string): never {
   logRefusal('session ended', why)
   setResponseHeader('set-cookie', clearedSessionCookies(isSecureRequest(from)))
 

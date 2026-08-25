@@ -49,6 +49,11 @@ public class Clinic {
 		return id;
 	}
 
+	/** What the Clinic calls itself, as a person reads it. */
+	public String name() {
+		return name;
+	}
+
 	public String slug() {
 		return slug;
 	}
