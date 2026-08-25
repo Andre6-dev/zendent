@@ -184,6 +184,23 @@ test('an unresolvable Clinic address is passed through as not found', async () =
   expect(response.headers.getSetCookie()).toHaveLength(0)
 })
 
+test('a host that names no Clinic says so instead of blaming access', async () => {
+  respondWith = () => ({
+    status: 403,
+    body: JSON.stringify({ status: 403, detail: 'Access denied' }),
+  })
+
+  const response = await handleSignIn(signInRequest(validCredentials))
+  const body = (await response.json()) as { message: string }
+
+  expect(response.status).toBe(403)
+  // "Access denied" is what the API says and it explains nothing: the real
+  // problem is the address, and the person needs to be told which one to use.
+  expect(body.message).not.toMatch(/access denied/i)
+  expect(body.message).toMatch(/address/i)
+  expect(response.headers.getSetCookie()).toHaveLength(0)
+})
+
 test('a malformed submission never reaches the API', async () => {
   const response = await handleSignIn(signInRequest({ email: 'not-an-email' }))
 

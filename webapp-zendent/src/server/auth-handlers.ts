@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { credentialsSchema } from '#/features/auth/schemas'
 import { callApi, problemMessage } from './api'
+import { logRefusal } from './log'
 import { isSecureRequest, sessionCookies } from './session'
 import type { ApiSession } from './session'
 
@@ -28,6 +29,17 @@ const REFUSED = 'Invalid credentials'
 const UNAVAILABLE = 'We could not sign you in right now. Try again shortly.'
 
 /**
+ * The API refuses a sign-in with 403 for exactly one reason: no Clinic was
+ * resolved, because the request did not arrive on a Clinic's own address. It
+ * answers with a generic "Access denied" that explains none of that, so the
+ * explanation is written here — a person on the wrong address otherwise has
+ * nothing at all to go on, which is precisely how this was first hit.
+ */
+const WRONG_ADDRESS =
+  'Open your clinic\u2019s own address to sign in \u2014 for example ' +
+  'avicena.zendent.app, not the plain domain.'
+
+/**
  * The BFF answers its own form and nothing else, so it speaks a plain
  * `{ message }` rather than the RFC 7807 the API uses between services. The
  * message is always one a person can read, never a status code to decode.
@@ -53,6 +65,16 @@ export async function handleSignIn(request: Request): Promise<Response> {
     body: JSON.stringify(credentials.data),
     from: request,
   })
+
+  // A host naming no Clinic is a wrong address, not a rejected credential, and
+  // saying so is more use than anything the API can say about it.
+  if (answer.status === 403 || answer.status === 404) {
+    logRefusal(
+      'sign-in refused',
+      `${new URL(request.url).hostname} names no Clinic (API said ${answer.status})`,
+    )
+    return json(answer.status, { message: WRONG_ADDRESS })
+  }
 
   if (!answer.ok) {
     // The fallback depends on what actually failed. Describing a 500 as

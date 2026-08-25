@@ -6,7 +6,8 @@ To run this application:
 
 ```bash
 bun install
-ZENDENT_API_PORT=8080 bun --bun run dev
+cp .env.example .env
+bun --bun run dev
 ```
 
 Then open **`http://avicena.localhost:3000`** — a clinic subdomain, not plain
@@ -14,11 +15,20 @@ Then open **`http://avicena.localhost:3000`** — a clinic subdomain, not plain
 and by nothing else, so plain `localhost` names no clinic and the API answers
 404. Chrome and Firefox resolve `*.localhost` with no change to `/etc/hosts`.
 
-`ZENDENT_API_PORT` is development-only. It exists because the backend listens on
-its own port locally, while in production the API is served under the same host
-as the app, under `/api` (see `docs/adr/0017-*`). Only the port is overridden —
-the clinic label in the hostname is carried through untouched. Start the backend
-first: `cd ../api && ./mvnw spring-boot:run`.
+`.env.example` documents the settings; `.env` is yours and is git-ignored. The
+one that matters locally is `ZENDENT_API_PORT`, because the backend listens on
+its own port here, while in production the API is served under the same host as
+the app, under `/api` (see `docs/adr/0017-*`). Only the port is overridden — the
+clinic label in the hostname is carried through untouched.
+
+Start the backend first — the `local` profile is required, it carries the
+datasource and the tenant settings:
+
+```bash
+cd ../api
+docker compose -f compose.yaml up -d
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+```
 
 # Building For Production
 

@@ -1,3 +1,5 @@
+import { logApiExchange, logRefusal } from './log'
+
 /**
  * The one place the application talks to the API.
  *
@@ -38,20 +40,41 @@ export interface ApiCall {
   from: Request
 }
 
-export function callApi(call: ApiCall): Promise<Response> {
+export async function callApi(call: ApiCall): Promise<Response> {
   const headers = new Headers()
   if (call.body !== undefined) {
     headers.set('content-type', 'application/json')
   }
 
-  return fetch(apiUrlFor(call.from, call.path), {
-    method: call.method,
-    headers,
-    body: call.body,
-    // The API answers 401 and 404 as part of its contract; a redirect would be
-    // the infrastructure talking, and following one silently would hide it.
-    redirect: 'manual',
-  })
+  const url = apiUrlFor(call.from, call.path)
+  const startedAt = Date.now()
+
+  try {
+    const response = await fetch(url, {
+      method: call.method,
+      headers,
+      body: call.body,
+      // The API answers 401 and 404 as part of its contract; a redirect would
+      // be the infrastructure talking, and following one silently would hide it.
+      redirect: 'manual',
+    })
+
+    // Logged with the URL, because the host in it is what decides the Clinic —
+    // and calling the wrong host is the failure that leaves no other trace.
+    logApiExchange({
+      method: call.method,
+      url,
+      status: response.status,
+      ms: Date.now() - startedAt,
+    })
+    return response
+  } catch (cause) {
+    logRefusal(
+      `${call.method} ${url} could not be reached`,
+      cause instanceof Error ? cause.message : String(cause),
+    )
+    throw cause
+  }
 }
 
 /**
