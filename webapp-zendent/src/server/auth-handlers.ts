@@ -1,8 +1,7 @@
-import { z } from 'zod'
 import { credentialsSchema } from '#/features/auth/schemas'
 import { callApi, problemMessage } from './api'
 import { logRefusal } from './log'
-import { isSecureRequest, sessionCookies } from './session'
+import { apiSessionSchema, isSecureRequest, sessionCookies } from './session'
 import type { ApiSession } from './session'
 
 /**
@@ -11,13 +10,6 @@ import type { ApiSession } from './session'
  * straight into HTTP-only cookies, and the caller gets back a body that names
  * no credential at all.
  */
-
-const apiSessionSchema = z.object({
-  accessToken: z.string().min(1),
-  tokenType: z.string(),
-  expiresIn: z.number().int().positive(),
-  refreshToken: z.string().min(1),
-})
 
 /**
  * Used only when the API refuses the credentials and says nothing more. Never

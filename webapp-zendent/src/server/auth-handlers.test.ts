@@ -1,74 +1,38 @@
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
-import { createServer } from 'node:http'
-import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import { handleSignIn } from './auth-handlers'
+import { startApiStub } from './testing/api-stub'
+import type { ApiStub, Recorded } from './testing/api-stub'
 
 /**
- * The API is stood up as a local stub. Its shapes come from the backend's
- * published document, not from imagination: sign-in answers
+ * The shapes the stub answers with come from the backend's published document,
+ * not from imagination: sign-in answers
  * `{accessToken, tokenType, expiresIn, refreshToken}` and refuses with an
  * RFC 7807 problem detail.
- *
- * The stub cannot prove that the frontend and the backend agree — that is this
- * seam's known blind spot, recorded in the spec. It proves what the BFF does.
  */
-interface Recorded {
-  method: string
-  url: string
-  host: string | undefined
-  body: string
-}
-
-let server: Server
+let api: ApiStub
 let apiPort: number
 let received: Array<Recorded>
-let respondWith: (body: string) => { status: number; body: string }
 
-function readBody(request: IncomingMessage): Promise<string> {
-  return new Promise((resolve) => {
-    let raw = ''
-    request.on('data', (chunk) => (raw += chunk))
-    request.on('end', () => resolve(raw))
-  })
+/** How the stub answers the next sign-in. Set per test. */
+function respondWith(
+  answer: (body: string) => { status: number; body: string },
+) {
+  api.answerWith((call) => answer(call.body))
 }
 
 beforeAll(async () => {
-  server = createServer(
-    (request: IncomingMessage, response: ServerResponse) => {
-      void readBody(request).then((body) => {
-        received.push({
-          method: request.method ?? '',
-          url: request.url ?? '',
-          host: request.headers.host,
-          body,
-        })
-        const answer = respondWith(body)
-        response.writeHead(answer.status, {
-          'content-type': 'application/json',
-        })
-        response.end(answer.body)
-      })
-    },
-  )
-
-  // Bound on every interface: the BFF reaches the stub through the Clinic
-  // hostname it was called on, and `avicena.localhost` resolves to ::1.
-  await new Promise<void>((resolve) => server.listen(0, resolve))
-  const address = server.address()
-  if (address === null || typeof address === 'string') {
-    throw new Error('the stub API did not bind to a port')
-  }
-  apiPort = address.port
-  process.env.ZENDENT_API_PORT = String(apiPort)
+  api = await startApiStub()
+  apiPort = api.port
+  received = api.received
 })
 
 afterAll(async () => {
-  await new Promise<void>((resolve) => server.close(() => resolve()))
+  await api.close()
 })
 
 beforeEach(() => {
-  received = []
-  respondWith = () => ({
+  api.reset()
+  respondWith(() => ({
     status: 200,
     body: JSON.stringify({
       accessToken: 'access-token-value',
@@ -76,7 +40,7 @@ beforeEach(() => {
       expiresIn: 900,
       refreshToken: 'refresh-token-value',
     }),
-  })
+  }))
 })
 
 function signInRequest(
@@ -125,7 +89,7 @@ test('the Clinic travels to the API as the host, never as a body field', async (
   await handleSignIn(signInRequest(validCredentials, 'avicena.localhost:3000'))
 
   expect(received).toHaveLength(1)
-  expect(received[0].url).toBe('/auth/login')
+  expect(received[0].path).toBe('/auth/login')
   expect(received[0].host).toBe(`avicena.localhost:${apiPort}`)
   expect(JSON.parse(received[0].body)).toEqual(validCredentials)
 })
@@ -137,7 +101,7 @@ test('a different Clinic subdomain reaches the API as that Clinic', async () => 
 })
 
 test('wrong credentials are refused without saying which half was wrong', async () => {
-  respondWith = () => ({
+  respondWith(() => ({
     status: 401,
     body: JSON.stringify({
       type: 'about:blank',
@@ -145,7 +109,7 @@ test('wrong credentials are refused without saying which half was wrong', async 
       status: 401,
       detail: 'Invalid credentials',
     }),
-  })
+  }))
 
   const response = await handleSignIn(signInRequest(validCredentials))
   const body = (await response.json()) as { message: string }
@@ -157,10 +121,10 @@ test('wrong credentials are refused without saying which half was wrong', async 
 })
 
 test('a failure that is not about the credentials does not blame them', async () => {
-  respondWith = () => ({
+  respondWith(() => ({
     status: 500,
     body: JSON.stringify({ status: 500, title: 'Internal Server Error' }),
-  })
+  }))
 
   const response = await handleSignIn(signInRequest(validCredentials))
   const body = (await response.json()) as { message: string }
@@ -173,10 +137,10 @@ test('a failure that is not about the credentials does not blame them', async ()
 })
 
 test('an unresolvable Clinic address is passed through as not found', async () => {
-  respondWith = () => ({
+  respondWith(() => ({
     status: 404,
     body: JSON.stringify({ status: 404, detail: 'Unknown clinic address' }),
-  })
+  }))
 
   const response = await handleSignIn(signInRequest(validCredentials))
 
@@ -185,10 +149,10 @@ test('an unresolvable Clinic address is passed through as not found', async () =
 })
 
 test('a host that names no Clinic says so instead of blaming access', async () => {
-  respondWith = () => ({
+  respondWith(() => ({
     status: 403,
     body: JSON.stringify({ status: 403, detail: 'Access denied' }),
-  })
+  }))
 
   const response = await handleSignIn(signInRequest(validCredentials))
   const body = (await response.json()) as { message: string }

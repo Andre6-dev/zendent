@@ -34,16 +34,28 @@ export function apiUrlFor(from: Request, path: string): string {
 export interface ApiCall {
   path: string
   method: string
-  /** Already-serialised JSON, or undefined for a bodiless call. */
+  /**
+   * Already-serialised JSON, or undefined for a bodiless call. A string rather
+   * than a stream on purpose: a call that has to be made twice — once before a
+   * renewal and once after — cannot be built out of a body already consumed.
+   */
   body?: string
   /** The browser's request, whose host names the Clinic. */
   from: Request
+  /**
+   * The access token to present, for the calls made on behalf of a signed-in
+   * person. Absent on the ones made on nobody's behalf, such as signing in.
+   */
+  bearer?: string
 }
 
 export async function callApi(call: ApiCall): Promise<Response> {
   const headers = new Headers()
   if (call.body !== undefined) {
     headers.set('content-type', 'application/json')
+  }
+  if (call.bearer !== undefined && call.bearer.length > 0) {
+    headers.set('authorization', `Bearer ${call.bearer}`)
   }
 
   const url = apiUrlFor(call.from, call.path)

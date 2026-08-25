@@ -1,9 +1,11 @@
-import { afterAll, beforeAll, expect, test } from 'vitest'
+import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { readdirSync } from 'node:fs'
+import { createServer as createApiStub } from 'node:http'
+import type { Server } from 'node:http'
 import { createServer } from 'vite'
 import type { ViteDevServer } from 'vite'
 import type { AddressInfo } from 'node:net'
-import { ACCESS_COOKIE } from '#/server/session'
+import { ACCESS_COOKIE, REFRESH_COOKIE } from '#/server/session'
 
 /**
  * The application is stood up for real and answered with over HTTP. Nothing
@@ -19,8 +21,27 @@ import { ACCESS_COOKIE } from '#/server/session'
 
 let server: ViteDevServer
 let origin: string
+let api: Server
+/** How the stubbed API answers the next exchange. */
+let exchange: { status: number; body: string }
+
+const RENEWED = {
+  accessToken: 'renewed-access-token',
+  tokenType: 'Bearer',
+  expiresIn: 900,
+  refreshToken: 'rotated-refresh-token',
+}
 
 beforeAll(async () => {
+  // The API the application renews against, stood up in this process so the
+  // dev server below reaches it through `ZENDENT_API_PORT`.
+  api = createApiStub((_request, response) => {
+    response.writeHead(exchange.status, { 'content-type': 'application/json' })
+    response.end(exchange.body)
+  })
+  await new Promise<void>((resolve) => api.listen(0, resolve))
+  process.env.ZENDENT_API_PORT = String((api.address() as AddressInfo).port)
+
   server = await createServer({
     root: process.cwd(),
     server: { port: 0 },
@@ -33,6 +54,11 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await server.close()
+  await new Promise<void>((resolve) => api.close(() => resolve()))
+})
+
+beforeEach(() => {
+  exchange = { status: 200, body: JSON.stringify(RENEWED) }
 })
 
 /**
@@ -90,3 +116,51 @@ test('the sign-in screen stays reachable without a session', async () => {
   expect(response.status).toBe(200)
   expect(await response.text()).toContain('Sign in')
 }, 60_000)
+
+/**
+ * The access cookie expires with the token it carries, so a person coming back
+ * after a break arrives holding only the refresh cookie. That is the case the
+ * whole renewal path exists for, and it is asserted here on the document the
+ * server sends back rather than on the mechanism underneath it.
+ */
+const lapsed = `${REFRESH_COOKIE}=live-refresh-token`
+
+test('a lapsed access token is renewed at the door and the application still renders', async () => {
+  const response = await get('/reservations', lapsed)
+  const body = await response.text()
+
+  expect(response.status).toBe(200)
+  expect(body).toContain('Customer Support')
+})
+
+test('the renewed session is put back in the browser', async () => {
+  const response = await get('/reservations', lapsed)
+  const cookies = response.headers.getSetCookie()
+
+  expect(cookies).toHaveLength(2)
+  expect(cookies[0]).toContain(`${ACCESS_COOKIE}=renewed-access-token`)
+  expect(cookies[1]).toContain(`${REFRESH_COOKIE}=rotated-refresh-token`)
+  for (const cookie of cookies) {
+    expect(cookie).toContain('HttpOnly')
+  }
+})
+
+test('no token reaches the browser in the renewed document', async () => {
+  const body = await (await get('/reservations', lapsed)).text()
+
+  expect(body).not.toContain('renewed-access-token')
+  expect(body).not.toContain('rotated-refresh-token')
+})
+
+test('a refusal at the exchange empties the session and sends the person to sign-in', async () => {
+  exchange = { status: 401, body: '{"detail":"Token already spent"}' }
+
+  const response = await get('/reservations', lapsed)
+
+  expect(response.status).toBe(307)
+  expect(response.headers.get('location')).toBe('/login')
+  expect(await response.text()).toBe('')
+  for (const cookie of response.headers.getSetCookie()) {
+    expect(cookie).toContain('Max-Age=0')
+  }
+})
