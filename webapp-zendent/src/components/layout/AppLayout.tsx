@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Sidebar } from './Sidebar'
 import { Navbar } from './Navbar'
+import type { SignedInMember } from '#/features/auth/session'
 
 interface AppLayoutProps {
+  /** Who is signed in, and the Clinic they are signed in to. */
+  member: SignedInMember
   children: React.ReactNode
 }
 
 /** Shell with a persistent sidebar (desktop) / drawer (mobile) and a top navbar. */
-export function AppLayout({ children }: AppLayoutProps) {
+export function AppLayout({ member, children }: AppLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   useEffect(() => {
@@ -23,7 +26,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
       {/* Desktop sidebar */}
       <div className="hidden lg:block">
-        <Sidebar />
+        <Sidebar member={member} />
       </div>
 
       {/* Mobile drawer */}
@@ -41,13 +44,13 @@ export function AppLayout({ children }: AppLayoutProps) {
             aria-label="Navigation"
             className="absolute inset-y-0 left-0 animate-in slide-in-from-left-4 duration-200"
           >
-            <Sidebar onNavigate={() => setMobileOpen(false)} />
+            <Sidebar member={member} onNavigate={() => setMobileOpen(false)} />
           </div>
         </div>
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <Navbar onMenuClick={() => setMobileOpen(true)} />
+        <Navbar member={member} onMenuClick={() => setMobileOpen(true)} />
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
     </div>

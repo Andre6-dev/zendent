@@ -67,6 +67,38 @@ class AuthenticatedClinicContextIntegrationTest {
 	}
 
 	@Test
+	void theSessionCarriesNamesAPersonCanRead() throws Exception {
+		// Issue #49: a navigation bar has nothing to show but a UUID otherwise.
+		Session session = signIn();
+
+		mockMvc.perform(get("/me").with(serverName(session.slug() + ".localhost")).header("Authorization", session.bearer()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.memberName").value("Ada Admin"))
+			.andExpect(jsonPath("$.clinicName").value(session.clinicName()));
+	}
+
+	@Test
+	void eachSessionIsNamedAfterItsOwnClinic() throws Exception {
+		// Not an isolation proof — that is RowLevelSecurityIntegrationTest's job,
+		// at the seam where the two layers of ADR 0008 can be told apart. What is
+		// asserted here is narrower and still worth having: each session is
+		// described with its own Clinic's name rather than with whichever one the
+		// widened response happened to reach first.
+		Session clinicA = signIn();
+		Session clinicB = signIn();
+
+		mockMvc.perform(get("/me").with(serverName(clinicA.slug() + ".localhost")).header("Authorization", clinicA.bearer()))
+			.andExpect(jsonPath("$.clinicName").value(clinicA.clinicName()))
+			.andExpect(jsonPath("$.memberName").value("Ada Admin"))
+			.andExpect(jsonPath("$.email").value(clinicA.email()));
+		mockMvc.perform(get("/me").with(serverName(clinicB.slug() + ".localhost")).header("Authorization", clinicB.bearer()))
+			.andExpect(jsonPath("$.clinicName").value(clinicB.clinicName()))
+			.andExpect(jsonPath("$.email").value(clinicB.email()));
+
+		assertThat(clinicA.clinicName()).isNotEqualTo(clinicB.clinicName());
+	}
+
+	@Test
 	void aTokenFromAnotherClinicIsRefusedOnThisSubdomain() throws Exception {
 		Session clinicA = signIn();
 		Session clinicB = signIn();
@@ -197,7 +229,7 @@ class AuthenticatedClinicContextIntegrationTest {
 			.andReturn().getResponse().getContentAsString();
 
 		return new Session(UUID.fromString(JsonPath.read(registration, "$.clinicId")), slug, email,
-				JsonPath.read(login, "$.accessToken"));
+				"Clinic " + suffix, JsonPath.read(login, "$.accessToken"));
 	}
 
 	private static String registrationBody(UUID suffix) {
@@ -219,7 +251,7 @@ class AuthenticatedClinicContextIntegrationTest {
 		};
 	}
 
-	private record Session(UUID clinicId, String slug, String email, String accessToken) {
+	private record Session(UUID clinicId, String slug, String email, String clinicName, String accessToken) {
 
 		String bearer() {
 			return "Bearer " + accessToken;
